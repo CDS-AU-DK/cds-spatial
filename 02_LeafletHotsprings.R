@@ -6,8 +6,8 @@
   
 # Packages
   
-install.packages("htmltab")
-install.packages("leaflet")
+# install.packages("htmltools")
+# install.packages("leaflet")
 
 # Load libraries
 suppressMessages({
@@ -73,7 +73,7 @@ springs.SP <- st_transform(springs.SP, crs=4326) # Base imagery is 3D
 
 library(leaflet)
 
-leaflet() %>%
+springsmap <- leaflet() %>%
   addTiles() %>%
   addProviderTiles("Esri.WorldTopoMap", group = "Topo") %>%
   addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
@@ -87,4 +87,4 @@ leaflet() %>%
     overlayGroups = c("Hot SPrings"),
     options = layersControlOptions(collapsed = T))
 
-
+springsmap

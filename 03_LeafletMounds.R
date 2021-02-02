@@ -2,9 +2,9 @@
 
 # packages
 
-install.packages("tidyverse")
-install.packages("leaflet")
-install.packages("htmltab")
+# install.packages("tidyverse")
+# install.packages("leaflet")
+# install.packages("htmltools")
 
 # load libraries
 

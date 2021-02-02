@@ -6,10 +6,13 @@
 ## beware that some need extra options specified
 
 # Packages
-install.packages("leaflet")
+# install.packages("leaflet")
+# install.packages("htmltools")
 
 # Example with Markers
 library(leaflet)
+library(htmltools)
+
 
 popup = c("Robin", "Jakub", "Jannes")
 
@@ -76,21 +79,21 @@ AUSmap <- l_aus %>%
     primaryAreaUnit = "sqmeters",
     activeColor = "#3D535D",
     completedColor = "#7D4479") %>% 
-  htmlwidgets::onRender("
-                        function(el, x) {
-                        var myMap = this;
-                        myMap.on('baselayerchange',
-                        function (e) {
-                        myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
-                        })
-                        }")
+  # htmlwidgets::onRender("
+  #                       function(el, x) {
+  #                       var myMap = this;
+  #                       myMap.on('baselayerchange',
+  #                       function (e) {
+  #                       myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
+  #                       })
+  #                       }")
 addControl("", position = "topright")
 
 ################################## SAVE FINAL PRODUCT
 
 # Save map as a html document (optional, replacement of pushing the export button)
 # only works in root
-
+library(htmlwidgets)
 saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
 
 
