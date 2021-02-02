@@ -1,2 +1,2 @@
 # spatial-analytics
-exercises for spatial analytics couse
+exercises for spatial analytics course, updated as the semester unfolds
