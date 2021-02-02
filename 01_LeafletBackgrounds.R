@@ -12,7 +12,7 @@
 # Example with Markers
 library(leaflet)
 library(htmltools)
-
+library(htmlwidgets)
 
 popup = c("Robin", "Jakub", "Jannes")
 
