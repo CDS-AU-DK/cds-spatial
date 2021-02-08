@@ -1,0 +1,102 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <CategoryNames>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Open Water</Category>
+      <Category>Perennial Ice Snow</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Developed, Open Space</Category>
+      <Category>Developed, Low Intensity</Category>
+      <Category>Developed, Medium Intensity</Category>
+      <Category>Developed High Intensity</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Bare Rock/Sand/Clay</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Deciduous Forest</Category>
+      <Category>Evergreen Forest</Category>
+      <Category>Mixed Forest</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Dwarf Shrub</Category>
+      <Category>Shrub/Scrub</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Grasslands/Herbaceous</Category>
+      <Category>Sedge/Herbaceous</Category>
+      <Category></Category>
+      <Category>Moss</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Pasture/Hay</Category>
+      <Category>Cultivated Crops</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Woody Wetlands</Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category></Category>
+      <Category>Emergent Herbaceous Wetlands</Category>
+    </CategoryNames>
+  </PAMRasterBand>
+</PAMDataset>
