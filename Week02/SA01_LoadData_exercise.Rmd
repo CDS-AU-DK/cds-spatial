@@ -95,6 +95,3 @@ Questions:
 1. What are the dimensions (number of columns and rows) of the `canopy` raster?
 2. What is the resolution of `manhattan`?
 
-
-
-Nice work you've learned how to read in single and multi-band rasters. You should have noticed, based on the `nlayers()` function, that the `canopy` object has a single layer and the `manhattan` object has three.
