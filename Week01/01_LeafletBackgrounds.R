@@ -6,16 +6,19 @@
 ## beware that some need extra options specified
 
 # Packages
-install.packages("leaflet")
+# install.packages("leaflet")
+# install.packages("htmltools")
 
 # Example with Markers
 library(leaflet)
+library(htmltools)
+library(htmlwidgets)
 
 popup = c("Robin", "Jakub", "Jannes")
 
 leaflet() %>%
   addProviderTiles("Esri.WorldPhysical") %>% 
- #addProviderTiles("Esri.WorldImagery") %>% 
+  addProviderTiles("Esri.WorldImagery") %>% 
   addAwesomeMarkers(lng = c(-3, 23, 11),
                     lat = c(52, 53, 49), 
                     popup = popup)
@@ -83,17 +86,19 @@ AUSmap <- l_aus %>%
                         function (e) {
                         myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
                         })
-                        }")
+                        }") %>%
 addControl("", position = "topright")
+
+AUSmap
 
 ################################## SAVE FINAL PRODUCT
 
 # Save map as a html document (optional, replacement of pushing the export button)
 # only works in root
-
+library(htmlwidgets)
 saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
 
-
+# for saving outside root https://stackoverflow.com/questions/41399795/savewidget-from-htmlwidget-in-r-cannot-save-html-file-in-another-folder
 ################################## ADD DATA TO LEAFLET
 # Libraries
 library(tidyverse)
@@ -102,12 +107,17 @@ library(leaflet)
 
 places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=0",col_types = "cccnncn")
 glimpse(places)
+places <- places %>% filter(!is.na(Longitude))
 
-leaflet() %>% 
-  addTiles() %>% 
-  addMarkers(lng = places$Longitude, 
+gs4_auth_configure()
+gs4_has_token()
+
+
+MapDK %>% 
+  addCircleMarkers(lng = places$Longitude, 
              lat = places$Latitude,
-             popup = places$Description)
+             popup = places$Description,
+             clusterOptions = markerClusterOptions())
 
 #########################################################
 #
