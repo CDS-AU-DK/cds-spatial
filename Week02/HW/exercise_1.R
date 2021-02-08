@@ -37,7 +37,7 @@ library(spDataLarge)
 
 #### Existing code ####
 
-# We wrote the code to create a new map of New Zealand..
+# We wrote the code to create a new map of New Zealand.
 # Your role is to improve this map based on the suggestions below.
 
 tm_shape(nz_elev)  +

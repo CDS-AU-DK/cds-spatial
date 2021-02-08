@@ -7,22 +7,12 @@
 
 #### Goals ####
 
-# - Limit your data into an area of interest
-# - Create a new map
-
-# We highlighted all parts of the R script in which you are supposed to add your
-# own code with: 
-
-# /Start Code/ #
-
-print("Hello World") # This would be your code contribution
-
-# /End Code/ #
+# - Learn about Classification methods
 
 #### Required R libraries ####
 
 # We will use the sf, raster, and tmap packages.
-# Additionally, we will use the spData and spDataLarge packages that provide new datasets. 
+# Additionally, we will use the spData and spDataLarge packages that provide new datasets.
 # These packages have been preloaded to the worker2 workspace.
 
 library(sf)
@@ -33,47 +23,49 @@ library(spDataLarge)
 
 #### Data sets #### 
 
-# We will use two data sets: `srtm` and `zion`.
-# The first one is an elevation raster object for the Zion National Park area, and the second one is an sf object with polygons representing borders of the Zion National Park.
+# We will use a single data set:  `nz`. It is contained by the libraries
+# It is an sf object with polygons representing the 16 regions of New Zealand.
 
-srtm <- raster(system.file("raster/srtm.tif", package = "spDataLarge"))
-zion <- read_sf(system.file("vector/zion.gpkg", package = "spDataLarge"))
+#### Existing code ####
 
-# Additionally, the last exercise (IV) will used the masked version of the `lc_data` dataset.
+# Here are some examples of plotting population in  New Zealand.
+# Your role is to create a map based on the suggestions below, 
+# selecting the most meaningful classification style.
 
-study_area <- read_sf("data/study_area.gpkg")
-lc_data <- raster("data/example_landscape.tif")
-lc_data_masked <- mask(crop(lc_data, study_area), study_area)
+# Look at NZ population distribution
+hist(nz$Population)
 
-# The exercises below represent a continuation of exercise 2 from Week 02
+# This line of code applies the 'pretty' style rounding legend numbers. Try different numbers of classes.
+tm_shape(nz) + tm_polygons(col = "Population", style = "pretty", n = 4)
 
-#### Exercise III ####
+# "Jenks" style further smooths over the gaps
+tm_shape(nz) + tm_polygons(col = "Population", style = "jenks", n = 5)
 
-# 1. Use the `zion` and `srtm2` objects.
-# Crop and mask the `srtm2` object to the borders of the `zion` object.
+# quantile style divides into 5 even groups
+tm_shape(nz) + tm_polygons(col = "Population", style = "quantile", n=5)
+
+# Equal interval style divides the distribution into even groups
+tm_shape(nz) + tm_polygons(col = "Population", style = "equal", n = 5)
+
+# Write maps above to objects and plot them side by side 
+# with tmap_arrange() for better comparison
+tmap_arrange(___,___,___,____)
+
+
+#### Exercise I ####
+
+# 1. What are the advantages and disadvantages of each classification method?
+# 2. Choose the best classification and create a map with easily legible legend and all other essentials.
+# (Select a suitable color palette from http://colorbrewer2.org/, north arrow, scale, map title, 
+# legend title, reasonable number of breaks in the classification )
+# 3. Which method and how many classes did you end up using to display
+# your data? Why did you select that method?
+# 4. What principles did you use in arranging the parts of your map layout the way you
+# did and how did you apply these principles?
 
 # Your solution
 
 # /Start Code/ #
 
 
-
 # /End Code/ #
-
-
-#### Exercise IV ####
-
-# 1. Create a new map of the `lc_data_masked` dataset.
-# 2. Save the obtained map to a new file "LC_YOURNAME.png".
-
-# Your solution
-
-# /Start Code/ #
-
-
-
-# /End Code/ #
-
-
-
-
