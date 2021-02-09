@@ -1,2 +1,16 @@
-# spatial-analytics
-exercises for spatial analytics course, updated as the semester unfolds
+# Spatial Analytics - Spring 2021
+
+This repository contains all of the code and data related to the Spring 2021 module Spatial Analytics as part of the bachelor's tilvalg in Cultural Data Science at Aarhus University.
+
+This repository is in active development, with new material being pushed on a weekly basis.
+
+## Class times
+This class takes place on Tuesday mornings from 8-12. Teaching will take place on Zoom, the link for which will be posted on Slack and Blackboard.
+
+## Course overview and readings
+A detailed breakdown of the course requirements, assessment and the associated readings can be found in the [syllabus](https://docs.google.com/document/d/1pb_ScrIpAhU5gFr-XM_NzawMjxjsYfnJhxP5vIYHP8U/edit#) and on Blackboard. Also, be sure to familiarise yourself with the [_studieordning_](https://eddiprod.au.dk/EDDI/webservices/DokOrdningService.cfc?method=visGodkendtOrdning&dokOrdningId=15952&sprog=en) for the course, especially in relation to examination and academic regulations.
+
+## Contact details
+The instructor is [Adela](https://pure.au.dk/portal/da/persons/adela-sobotkova(2b586b3a-ca43-404e-b68c-113ec08b4ee9).html).
+
+All communication to you will be sent both on Slack and via Blackboard. If you need to get in touch with me, please use Slack!
