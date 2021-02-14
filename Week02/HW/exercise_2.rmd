@@ -1,0 +1,158 @@
+---
+title: "W2- Exercise 2"
+Author: "Adela Sobotkova and Peter Thramkrongart"
+output: github_document
+---
+
+
+## Goals
+
+- Understand the provided datasets  
+- Learn how to reproject spatial data  
+- Limit your data into an area of interest  
+- Create a new map  
+
+We highlighted all parts of the R script in which you are supposed to add your
+own code with: 
+
+# /Start Code/ #
+```{r}
+print("Hello World") # This would be your code contribution
+```
+
+
+# /End Code/ #
+
+## Required R libraries
+
+We will use the sf, raster, and tmap packages.
+Additionally, we will use the spData and spDataLarge packages that provide new datasets. 
+These packages have been preloaded to the worker2 workspace.
+
+```{r}
+library(sf)
+library(raster)
+library(tmap)
+library(spData)
+library(spDataLarge)
+library(tidyverse)
+```
+
+## Data sets
+
+We will use two data sets: `srtm` and `zion`.
+The first one is an elevation raster object for the Zion National Park area, and the second one is an sf object with polygons representing borders of the Zion National Park.
+
+```{r}
+srtm <- raster(system.file("raster/srtm.tif", package = "spDataLarge"))
+zion <- read_sf(system.file("vector/zion.gpkg", package = "spDataLarge"))
+
+# Additionally, the last exercise (IV) will used the masked version of the `lc_data` dataset.
+
+study_area <- read_sf("data/study_area.gpkg")
+lc_data <- raster("data/example_landscape.tif")
+lc_data_masked <- mask(crop(lc_data, study_area), study_area)
+```
+## Exercise I
+
+1. Display the `zion` object and view its structure.
+
+What can you say about the content of this file?  
+What type of data does it store?  
+What is the coordinate system used?  
+How many attributes does it contain?  
+What is its geometry?  
+
+2. Display the `srtm` object and view its structure.  
+What can you say about the content of this file?  
+What type of data does it store?  
+What is the coordinate system used?  
+How many attributes does it contain?  
+How many dimensions does it have?  
+What is the data resolution?  
+
+Your solution (type answer to the questions as code comments and the code used)
+
+# /Start Code/ #
+
+```{r}
+
+#1. Display the `zion` object and view its structure.
+# What can you say about the content of this file?
+#It is an sf object with polygons representing borders of the Zion National Park
+#It has some meta data about such as date, name of the park, link to the full metadata and GNIS ID.
+# What type of data does it store? 
+zion %>% glimpse()# It's a vector object of the borders of Zion National Park.
+#I think it contains 11 attributes besides its geometry.
+srtm
+# What is the coordinate system used?
+zion %>% st_crs() # here is the coordinate reference system that is used
+
+# What is its geometry?
+zion %>%  st_geometry() #this is it's geometry
+
+zion %>%  st_geometry() %>% plot() #this is how it looks
+
+
+# 2. Display the `srtm` object and view its structure.
+# What can you say about the content of this file? 
+
+#It is an a single-band raster object for the elevation of Zion National Park area.
+srtm  # Here is a summary of its dimens, resolution, extent coordinate reference system and so on.
+
+# What type of data does it store?
+# It stores measures of elevation in a  single-band raster format
+
+# What is the coordinate system used? 
+srtm %>% crs() # Here is the coordinate system
+
+# How many attributes does it contain?
+srtm %>% glimpse()
+# How many dimensions does it have? 
+#I don't know how to find out
+# What is the data resolution?
+srtm %>% res() #this is the resolution
+```
+
+
+
+# /End Code/ #
+
+## Exercise II
+
+1. Reproject the `srtm` dataset into the coordinate reference system used in the `zion` object.  
+Create a new object `srtm2`  
+Vizualize the results using the `plot()`   function.
+2. Reproject the `zion` dataset into the  coordinate reference system used in the `srtm` object.  
+Create a new object `zion2`  
+Vizualize the results using the `plot()`function.  
+# Your solution
+
+# /Start Code/ #
+
+```{r}
+
+zion%>% st_crs()
+
+# Assign the CRS to srtm2
+#I'm not sure what i'm doing...
+crs_1 <- "+proj=longlat +ellps=WGS84 +units=m +no_defs"
+srtm2 <- srtm
+
+crs(srtm2) <- crs(crs_1)
+srtm2 %>% plot()
+
+
+zion2 <- zion
+srtm %>% crs()
+crs_2 = "+proj=longlat +datum=WGS84 +no_defs
++ellps=WGS84 +towgs84=0,0,0 "
+
+# Assign the CRS to zion
+st_crs(zion2) <- crs(crs_2)
+
+zion2 %>% st_geometry() %>% plot() #this looks weird...
+```
+
+
+# /End Code/ #
