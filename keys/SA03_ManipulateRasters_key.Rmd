@@ -1,0 +1,114 @@
+---
+title: "03 - Learn to Work with Rasters"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Learning about your raster objects
+Instead of storing raster objects in data frames, the `raster` package stores spatial data in specially designed R classes that contain slots where the data and metadata are stored. The data and metadata can be accessed using a suite of functions. For example, the spatial extent (the bounding box) of the object can be accessed with `extent()`, the coordinate reference system can be accessed with `crs()` and the number of grid cells can be determined with `ncell()`.
+
+## Instructions
+
+* Load the `raster` package.
+* Read in the tree canopy layer using `raster()` (it is a single-band raster called "canopy.tif").
+* Read in the Manhattan image layer using `brick()` (it is a multi-band raster called "manhattan.tif")
+* Use the `extent()` function to get the extent of the canopy layer.
+* Use the `crs()` function to get the coordinate reference system of manhattan.
+* Use the `ncell()` function to determine how many grid cells are in the canopy layer and the manhattan layer.
+
+## Solution to task 1
+```{r load raster sol, echo=TRUE}
+# Load the raster package
+library(raster)
+
+# Read in the rasters
+canopy <- raster("data/canopy.tif")
+manhattan <- brick("data/manhattan.tif")
+
+# Get the extent of the canopy object
+extent(canopy)
+
+# Get the CRS of the manhattan object
+crs(manhattan)
+
+# Determine the number of grid cells in both raster objects
+ncell(manhattan)
+ncell(canopy)
+```
+Great work! Although rasters are not stored as data frames, the metadata can easily be extracted using functions like `extent()`, `crs()` and `ncell()`.
+
+
+# Task 2: Accessing raster data values
+Raster data can be very big depending on the extent and resolution (grid size). In order to deal with this the `raster()` and `brick()` functions are designed to only read in the actual raster values as needed. To show that this is true, you can use the `inMemory()` function on an object and it will return `FALSE` if the values are not in memory. If you use the `head()` function, the `raster` package will read in only the values needed, not the full set of values. The raster values will be read in by default if you perform spatial analysis operations that require it or you can read in the values from a raster manually with the function `getValues()`.
+
+## Instructions
+
+* Use the `inMemory()` function on the canopy object to determine if the data has been read in.
+* Use the `head()` function to look at the first few values from the canopy raster.
+* Use the `getValues()` function on the canopy object to read in all the data.
+* Use the `hist()` function to create a quick histogram of the canopy values. Note the pile of values near 250, these should be `NA` and we will address this later.
+
+
+## Solution to task 2
+```{r, echo=TRUE}
+# Check if the data is in memory
+inMemory(canopy)
+
+# Use head() to peak at the first few records
+head(canopy)
+
+# Use getValues() to read the values into a vector
+vals <- getValues(canopy)
+
+# Use hist() to create a histogram of the values
+hist(vals)
+```
+
+Congratulations! You now know that the `raster` package only reads in raster values as needed to save space in memory. You can get the values manually using the `getValues()` function.
+
+
+# Task 3: Plot your raster object
+Similar to what you saw in the exercises related to vector objects it's often useful to quickly look at a map of your raster objects with the plot() function.
+
+The raster package has added useful methods for plotting both single and multi-band rasters. For single-band rasters or for a map of each layer in a multi-band raster you can simply use plot(). If you have a multi-band raster with layers for red, green and blue light you can use the plotRGB() function to plot the raster layers together as a single image.
+
+## Instructions
+
+* Plot the canopy raster with the `plot()` function, it is a single-band raster called `canopy`.
+* Plot the manhattan raster with the `plot()` function, it is a multi-band raster called `manhattan`.
+* Plot the manhattan raster with `plotRGB()` to see all layers plotted together as a single image.
+
+
+## Solution to task 3
+```{r plot raster sol, echo=TRUE}
+# Plot the canopy raster (single raster)
+plot(canopy)
+
+# Plot the manhattan raster (as a single image for each layer)
+plot(manhattan)
+
+# Plot the manhattan raster as an image
+plotRGB(manhattan)
+```
+
+Nice work! As you saw, the `plot()` function can be used to plot single layers while the `plotRGB()` function can be used to combine layers into a single image.

@@ -1,0 +1,101 @@
+---
+title: "06 - Slicing Rasters"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Change the raster grid cell size using aggregate
+For rasters, the function to reduce resolution is `aggregate()` which, as you might guess, aggregates grid cells into larger grid cells using a user-defined function (for example, mean or max). The function used to aggregate the values is determined by the fun argument (the default being mean) and the amount of aggregation is driven by the fact (the default being 2) argument.
+
+## Instructions
+
+* Ensure that `raster` library is loaded
+* Read in the canopy layer (it is a single-band raster and the file name is "canopy.tif").
+* Plot the file you read in with `plot()`.
+* Determine the raster resolution using `res()` and number of raster cells in the layer with `ncell()`.
+* Aggregate the canopy raster using the default for fun and a factor of 10 and save the new raster to `canopy_small`.
+* Plot the new raster with `plot()` for comparison to the old version.
+* Determine the new raster resolution and the number of raster cells.
+
+
+## Solution to task 1
+```{r aggr-sol, echo=TRUE}
+# Library
+library(raster)
+
+# Read in the canopy layer
+canopy <- raster("data/canopy.tif")
+
+# Plot the canopy raster
+plot(canopy)
+
+# Determine the raster resolution
+res(canopy)
+
+# Determine the number of cells
+ncell(canopy)
+
+# Aggregate the raster
+canopy_small <- aggregate(canopy, fact = 10)
+
+# Plot the new canopy layer
+plot(canopy_small)
+
+# Determine the new raster resolution
+res(canopy_small)
+
+# Determine the number of cells in the new raster
+ncell(canopy_small)
+```
+
+Excellent job! In this example you read in a raster and then converted it to a lower resolution raster to save on the size of the object and ultimately computation power required. In this example, the raster was not too big to begin with so perhaps aggregating would not be necessary but for big rasters this can be a big help.
+
+# Task 2: Change values and handle missing values in rasters
+There are many situations where you might need to change raster values. You may want to change outlier values to `NA` for example. In the `raster` package, reclassification is performed with the `reclassify()` function.
+
+In the `canopy` raster you've worked with the values are percentages and are supposed to range between 0 and 100. Anything above 100 should be an `NA`. In this exercise you will assign any values above 100 to `NA`.
+
+## Instructions
+
+* Check that the package `raster` and the object `canopy` are loaded in your workspace.
+* Plot the `canopy` raster using `plot()`.
+* Set up a three-column matrix with the `cbind()` function and values 100, 300, NA.
+* Use the matrix and `reclassify()` to reclassify values above 100 to `NA`. You will need to use the argument `rcl`.
+* Plot the reclassified canopy layer to confirm there are no values above 100.
+
+
+## Solution to task 2
+```{r reclass-sol, echo=TRUE}
+# Plot the canopy layer to see the values above 100
+plot(canopy)
+
+# Set up the matrix
+vals <- cbind(100, 300, NA)
+
+# Reclassify 
+canopy_reclass <-reclassify(canopy, rcl = vals)
+
+# Plot again and confirm that the legend stops at 100
+plot(canopy_reclass)
+```
+
+Great work! Knowing how to reclassify rasters will come in handy. When you get a chance you should review the help for `reclassify()` particularly the part that discusses how to specify the `rcl` argument. The three-column approach from this exercise is most common but there are other approaches.

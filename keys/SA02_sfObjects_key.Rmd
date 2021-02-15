@@ -1,0 +1,197 @@
+---
+title: "02 - Learning about sf objects"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: sf objects are data frames
+As mentioned in the video, spatial objects in `sf` are just data frames with some special properties. This means that packages like `dplyr` can be used to manipulate `sf` objects. In this exercise, you will use the `dplyr` functions `select()` to select or drop variables, `filter()` to filter the data and `mutate()` to add or alter columns.
+
+We will also use the pipe operator (`%>%`) to save us some typing and simplify our code. If you're not familiar with the pipe, just think of it as the joints between an R workflow (pipeline) taking the result from the left hand side and sending it on to the next function. For example:
+
+`1:10 %>% mean %>% log`
+
+will create a vector 1 to 10 and "pipe" it over to the `mean()` function, then it will pipe this result to the `log()` function (the result in this case is 1.704748).
+
+To learn more you can check out the course Data Manipulation in R with dplyr.
+
+
+## Instructions
+
+* Load the `dplyr` and `sf` packages.
+* Read in the `trees` shapefile with `st_read()` (the file is "trees.shp").
+* Use the `filter()` function from `dplyr` on the `trees` object to create a new data frame limited to just honey locust trees.
+* Use the `nrow()` function on your new object to determine how many honey locust trees are in the dataset.
+* Use the `select()` function from dplyr to limit the variables in your honey locust dataset to just `tree_id` and `boroname` and create a new data frame.
+* Use the `head()` function to check which variables exist in your new data frame. Does the data frame only have the `tree_id` and `boroname` columns (the answer is no, we'll discuss later)?
+
+
+## Solution to task 1
+```{r wrangle-trees-sol, echo=TRUE}
+# Load the sf package
+library(sf)
+
+# ... and the dplyr (or tidyverse) package
+library(dplyr)
+
+# Read in the trees shapefile
+trees <- st_read("data/trees.shp")
+
+# Use filter() to limit to honey locust trees
+honeylocust <- trees %>% filter(species == "honeylocust")
+
+# Count the number of rows
+nrow(honeylocust)
+
+# Limit to tree_id and boroname variables
+honeylocust_lim <- honeylocust %>% select(tree_id, boroname) 
+
+# Use head() to look at the first few records
+head(honeylocust_lim)
+```
+Great! You can see why the `sf` package is so nice – your spatial objects are data frames that you can smoothly manipulate with dplyr. The number of honey locust trees is 6418. You may have noticed that when you used select the default is to keep the geometry column even if you didn't explicitly list it as a column in select.
+
+
+# Task 2: Geometry is stored in list-columns
+A major innovation in `sf` is that spatial objects are data frames. This is possible thanks, in part, to the list-column.
+
+A list-column behaves, to a certain extent, like any other R column. The main difference is that instead of a standard value such as a single number, character or boolean value, each observation value in that column is a piece of an R list and this list can be as complex as needed. The list column allows you to store far more information in a single variable and `sf` takes advantage of this by storing all geographic information for each feature in the list.
+
+In this exercise, you will convert the data frame to what's called a `tibble` with `tibble::as_tibble()` (Note that `dplyr::tbl_df()` is now deprecated).
+
+## Instructions
+
+* Load tidyverse in your workspace.
+* Create a simple data frame `df` that includes a single column `a` using `data.frame()`.
+* Add a list-column `b` to your data frame with the `list()` function.
+* Use `head()` to look at `df`.
+* Use `as_tibble()` to convert the data frame to a tibble and print it to the console. This is just for cleaner printing.
+* Pull out the third observation from columns `a` and `b` using `base` R (you'll need square brackets like `[3]`).
+
+
+## Solution to task 2
+```{r lists, echo=TRUE}
+# Create a standard, non-spatial data frame with one column
+df <- data.frame(a = 1:3)
+
+# Add a list column to your data frame
+df$b <- list(1:4, 1:5, 1:10)
+
+# Look at your data frame with head
+head(df)
+
+# Convert your data frame to a tibble and print on console
+as_tibble(df)
+
+# Pull out the third observation from both columns individually
+df$a[3]
+df$b[3]
+```
+You now have a better sense of what a list column is. You can see how it can be used to store far more information in a single variable than other types of columns. These list-columns are how `sf` stores detailed geographic information on each feature in a single record. Converting the data frame to a tibble is not necessary but a tibble can provide a better print out of the object.
+
+# Task 3: Extracting geometric information from your vector layers
+There are several functions in `sf` that allow you to access geometric information like area from your vector features. For example, the functions `st_area()` and `st_length()` return the area and length of your features, respectively.
+
+Note that the result of functions like `st_area()` and `st_length()` will not be a traditional vector. Instead the result has a class of `units` which means the vector result is accompanied by metadata describing the object's units. As a result, code like this won't quite work:
+
+```{r example1, eval=FALSE, echo=TRUE}
+# This will not work
+result <- st_area(parks)
+result > 30000
+```
+
+Instead you need to either remove the units with `unclass()`:
+
+```{r example2, eval=FALSE, echo=TRUE}
+# This will work
+val <- 30000
+unclass(result) > val
+```
+
+or you need to convert `val`'s class to `units`, for example:
+
+```{r example3, eval=FALSE, echo=TRUE}
+# This will work
+units(val) <- units(result)
+result > val
+```
+
+
+## Instructions
+
+* Read in the `parks` shapefile (the file is "parks.shp").
+* Compute the areas of the parks.
+* Create a histogram of the areas using `hist()` to quickly visualize the data spread.
+* Filter the parks object with `filter()` and limit to parks with `unclass(areas)` > 30000 (areas greater than 30,000 square meters).
+* Plot the geometry of the result with `plot()` and `st_geometry()`.
+
+
+## Solution to task 3
+```{r parks-sol, echo=TRUE}
+# Read in the parks shapefile
+parks <- st_read("data/parks.shp")
+
+# Compute the areas of the parks
+areas <- st_area(parks)
+
+# Create a quick histogram of the areas using hist
+hist(areas, xlim = c(0, 200000), breaks = 1000)
+
+# Filter to parks greater than 30000 (square meters)
+big_parks <- parks %>% filter(unclass(areas) > 30000)
+
+# Plot just the geometry of big_parks
+plot(st_geometry(big_parks))
+```
+
+Excellent! Computing geographic information for your vector layers can be done with functions like `st_area()` and `st_length()`. As you saw in this exercise, these functions produce a result that can be used in additional calculations but you need to be careful because the result is a `units` object that requires a little additional processing like using `unclass()`.
+
+
+# Task 4: First look at plotting vector spatial objects
+The function for making a quick map/plot is a function you are already familiar with, `plot()`. You can, for example, type `plot(my_data)` to see your spatial object. The default, though, may not be what you want. The `plot()` function, when applied to `sf` objects, will create a set of maps, one for each attribute in your data. Instead, if you want to create a map of a single attribute you can extract that attribute using, as an example, `plot(my_data["my_variable"])`.
+
+Frequently you just want to plot the raw geometry with no attribute color-coding (e.g., adding county boundaries to a map of points). For this, you can use the `st_geometry()` function to extract the geometry and plot the result. You can either create a new object or you can nest `st_geometry()` within the `plot()` function.
+
+## Instructions
+
+* Load the package `sf` and the `parks` object if you have removed them from your workspace.
+* Use `plot()` to plot the `parks` data using all defaults.
+* Plot just the `acres` attribute of parks.
+* Create a new object that is just the geometry of the parks object with `st_geometry()`.
+* Plot the geometry of the parks (the object you just created).
+
+## Solution to task 4
+```{r plotting-sf-sol, echo=TRUE}
+# Plot the parks object using all defaults
+plot(parks)
+
+# Plot just the acres attribute of the parks data
+plot(parks["acres"])
+
+# Create a new object of just the parks geometry
+parks_geo <- st_geometry(parks)
+
+# Plot the geometry of the parks data
+plot(parks_geo)
+```
+
+Well done! Yes, these plots are not pretty but you can't beat `plot()` for a quick look using few keystrokes. And remember you can use `plot(st_geometry(geo_object))` to plot just the geometry of your object.
