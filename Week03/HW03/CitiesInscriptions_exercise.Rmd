@@ -242,7 +242,9 @@ Additionally, it's a good idea to check the average distance between inscription
 
 *5. What is the average distance of all inscriptions from all the cities within the convex hull?*
 
-*6. What can you say about the spatial distribution of ancient inscriptions vis-a-vis the cities? What factors might be impacting the distribution?*
+*6. What can you say about the spatial distribution of ancient inscriptions vis-a-vis the cities?* 
+
+*7. What factors might be impacting the distribution?*
 
 
 # Task 8: CHALLENGE - Map all the data with Leaflet
