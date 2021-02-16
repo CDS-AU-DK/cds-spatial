@@ -1,0 +1,116 @@
+---
+title: "01 - Reading in the spatial data"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+# Introduction into GIS in R
+There are a few key spatial packages available for Spatial Analysis in R, which you need to install as you progress through these exercises. The most basic are 
+
+* `sf` for working with vector data
+* `raster` for working with raster data
+* `rgdal` for an R-friendly GDAL interface
+
+The installation of the geospatial libraries GDAL, GEOS and PROJ.4 varies significantly based on operating system (and can be entailed). All of these are dependencies for `sf`, the R package that we will be using for spatial data operations throughout this course. Please follow the Option A: Local installation instructions for your operating system on [this page](https://datacarpentry.org/geospatial-workshop/setup.html) under the heading GDAL, GEOS, and PROJ.4 and continue through the R Packages. Click on the linked pages to make your life easier.
+
+# Task 1: Reading vector data
+The `sf` package, created by Edzer Pebesma and colleagues, has dramatically simplified reading vector spatial data into R.
+
+In this exercise you will read in three shapefiles (one point file and two polygon files) using `st_read()`. If you've read in the files correctly, you will see a standard R data frame except it will show some header metadata about the file and you'll see a special `geometry` column which we will discuss later.
+
+## Instructions
+
+* Load the `sf` package.
+* All your datasets reside in the 'data' folder.
+* Import the `trees` shapefile ("trees.shp").
+* Import the `neighborhoods` shapefile ("neighborhoods.shp").
+* Import the `parks` shapefile ("parks.shp").
+* Use the `head()` function and identify the first few tree species.
+
+## Questions: 
+
+1. How many features do `trees` contain and what kind of geometry are they?
+2. How many features are there inside `neighborhoods` and what is their geometry?
+3. What is the CRS value in these objects?
+
+
+## Solution to task 1
+```{r load data, echo=TRUE}
+# Load the sf package
+library(sf)
+library(raster)
+
+# Read in the trees shapefile
+trees <- st_read("data/trees.shp")
+
+# Read in the neighborhood shapefile
+neighborhoods <- st_read("data/neighborhoods.shp")
+
+# Read in the parks shapefile
+parks <- st_read("data/parks.shp")
+
+# View the first few trees
+head(trees)
+
+# Answers
+trees
+neighborhoods
+crs(trees)
+crs(neighborhoods)
+```
+
+Well done, you can see how easy it can be to read in shapefiles and you got your first taste of what an sf object looks like.
+
+<br>
+
+# Task 2: Reading raster data
+The term "raster" refers to gridded data that can include satellite imagery, aerial photographs (like orthophotos) and other types. In R, raster data can be handled using the `raster` package created by Robert J. Hijmans.
+
+When working with raster data, one of the most important things to keep in mind is that the raw data can be what is known as "single-band" or "multi-band" and these are handled a little differently in R. Single-band rasters are the simplest, these have a single layer of raster values -- a classic example would be an elevation raster where each cell value represents the elevation at that location.
+
+Multi-band rasters will have more than one layer. An example is a color aerial photo in which there would be one band each representing red, green or blue light.
+
+## Instructions
+
+* Load the `raster` package.
+* Read in the tree canopy raster with the `raster()` function (this is a single-band raster called "canopy.tif").
+* Read in the Manhattan Landsat image with `brick()` (this is a multi-band raster called "manhattan.tif").
+* Use the `class()` function to determine the class of each raster object you read in.
+* Use the `nlayers()` function to determine how many bands/layers are in each object.
+
+Questions:
+
+1. What are the dimensions (number of columns and rows) of the `canopy` raster?
+2. What is the resolution of `manhattan`?
+
+
+
+Now you've learned how to read in single and multi-band rasters. You should have noticed, based on the `nlayers()` function, that the `canopy` object has a single layer and the `manhattan` object has three.
+
+
+## Solution to task 2
+```{r loadrasters, echo=TRUE}
+# Load the raster package
+library(raster)
+
+# Read in the tree canopy single-band raster
+canopy <- raster("data/canopy.tif")
+
+# Read in the manhattan Landsat image multi-band raster
+manhattan <- brick("data/manhattan.tif")
+
+# Get the class for the new objects
+class(canopy)
+class(manhattan)
+
+# Identify how many layers each object has
+nlayers(canopy)
+nlayers(manhattan)
+
+# Answers
+dim(canopy)
+res(manhattan)
+```
+

@@ -1,0 +1,266 @@
+---
+title: "Ancient cities and inscriptions"
+author: "Adela Sobotkova"
+date: "13/01/2021 updated `r format(Sys.time(), '%B %d, %Y')`" 
+output:
+  rmdformats::readthedown:
+  highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+In this exercise you will map the ancient equivalent of Twitter data: the ancient inscriptions. Ancient people of class, education, and means liked to advertise their achievements and life milestones as well as their sorrows via the means of texts inscribed in stone. These epigraphic monuments were often placed near inhabited areas, roads, and gathering places where they were likely to attract the largest audience. The location of these self-expressions in space and time is a reasonable indicator of changing economic prosperity of the commissioning communities. In this exercise, you will explore how these ancient inscriptions spatially correspond to the distribution of ancient cities and settlements.  
+
+```{r libraries, include=FALSE}
+library(sf)
+library(raster)
+library(tidyverse)
+library(leaflet)
+```
+
+# Task 1: Load ancient cities and convert to sf object
+John Hanson has created a dataset of all cities in the ancient Mediterranean and made it available online. You will download this dataset and convert it into an sf object in order to compare with the inscriptions on the basis of location.  
+
+* Use `read_csv()` to load `Hanson2016_Cities_OxREP.csv` dataset from the provided URL and assign it to `cities` object
+
+```{r load-cities, eval=FALSE}
+cities <- as.data.frame(read_csv("http://oxrep.classics.ox.ac.uk/oxrep/docs/Hanson2016/________________"))
+```
+
+
+... then reproject this data to EPSG 3035
+```{r prj-cities, eval=FALSE}
+# Convert the table into an sf object on the basis of X and Y columns
+cities_sf <- ________(cities, coords = c("Longitude (X)", "Latitude (Y)"))
+
+# Define the projection of Lat/Long coordinates as EPSG 4326
+cities_sf4326<- st_set_crs(cities_sf, ________)
+
+# Transform the projection to a 2D projection using EPSG 3035
+cities_sf3035<- st_transform(cities_sf4326, ___________)
+
+# Verify the projection is 'projected' not 'geographic'
+______(cities_sf3035)
+```
+
+
+### Question 1: 
+*What are the measurement units of the `cities_sf3035` object?*
+
+
+# Task 2: Create a buffer around each city and inspect the result
+
+As each city and inscription corresponds to a dot on the map, the best way to grab and review the inscriptions will be by creating a buffer around each city point and then selecting inscriptions on the basis of that. 
+
+* Create a buffer around the projected `cities` geometry with `st_buffer()` , setting the `dist` argument to the desired radius of 5000m.
+* Plot the resulting buffer with city on top for quick review. 
+
+```{r buff, eval=FALSE}
+# Make buffer of 5 km. Check the units of your object to correctly assign value to dist
+cities_5km<- st_buffer(_____,dist = _________)
+
+# Plot the first 10 buffers and cities to check result 
+plot(___________(___________)[1:10], col = "yellow")
+plot(___________(___________)[1:10], pch=20, cex = 0.1, add = TRUE)
+
+```
+
+
+# Task 3: Verify the city buffers are indeed 5km in radius
+Well, a quick review may look ok, but you cannot be sure your buffers work well until you add them to a map with a scale. Verify that your buffers are as big as should be by plotting a sample with tmap and adding a scale of good resolution.
+
+* Grab the first 10 cities and buffers with slice() function
+* Load tmap package and plot the 10 cities and buffers with a scale of 0,10,20km. Add names and background for clarity. Do your buffers span 10km across or do they span the universe? (If the latter, recheck your CRS, units, and dist argument)
+
+```{r tmap, eval=FALSE}
+# Grab the first 10 elements in the sf object and the buffer
+ten_buffers <- ________ %>% slice(1:10)
+ten_cities <- ________ %>% slice(1:10)
+
+# Create a quick tmap
+library(tmap)
+current.mode <- tmap_mode("plot")
+
+tm_shape(ten_buffers)  +
+  tm_polygons(col = ________) +
+  tm_shape(ten_cities) +
+  tm_text("Ancient Toponym", size = ___, auto.placement = 5) +
+  tm_dots(col = __________, 
+             size = 0.1) +
+  tm_scale_bar(breaks = ____________,
+               text.size = 10,
+               position = c("LEFT", "bottom")) +
+  tm_compass(position = c("LEFT", "bottom"),
+             type = "rose", 
+             size = 2) +
+  tm_credits(position = c(__________),
+             text = ________________) +
+  tm_layout(main.title = "Map with a scale",
+            bg.color = "beige",
+            inner.margins = c(0, 0, 0, 0))
+
+```
+
+
+If all went well, you should see a map, where the diameter of each city buffer corresponds to the 10km notch on the scale
+            
+# Task 4: Download ancient inscriptions and wrangle coordinates into shape 
+Let's now look at some data that spatially co-occurs with these ancient places. Below is a link to an online dataset from the Epigraphic Database of Heidelberg of ancient inscriptions from one part of the ancient world. These inscriptions combine private and official expressions dedicated for personal reasons (death of a dear person) or public (dedication of a major building, placement of milestone, etc.). 
+
+The json dataset is hefty with some 12 thousand inscriptions and 74 variables. Coordinates are nested in a single column and may need wrangling. Do tasks deliberately in small steps after you test on subsets lest you overwhelm your R.
+
+* Download the linked file with `download.file()` where you can find it. 
+* The inscriptions dataset is in `.json` format, which is becoming the dominant format for sharing data online. Use the `jsonlite::fromJSON` function in the library to load it back into R
+* Next, use `as_tibble()` to convert into rectangular format.  
+* Check the column names looking for something that holds spatial data. There should be a `coordinates` column. Look at the column whether it holds meaningful coordinates.
+* Separate the two values inside single coordinate column and create a separate longitude and a latitude column, which contain clean decimal numbers. You will need to clean up non-numeric characters en route. Make sure to keep the decimal point. Hint: there are lots of ways of getting clean decimal coordinates into two new columns, so feel free to diverge from the suggested course. Check out the `gsub()`, `grep()` and `str_extract()` functions to implement regular expressions in tidyverse pipeline. 
+
+```{r inscriptions, eval=FALSE}
+# Libraries
+library(tidyverse)
+library(jsonlite)
+library(tidytext)
+
+# Download the file and save as inscriptions.json (consider commenting out after you first run to avoid repeat downloading)
+download.file("https://sciencedata.dk/public/b6b6afdb969d378b70929e86e58ad975/EDH_subset_2021-02-15.json", "________/inscriptions.json")
+
+# Load it into R from wherever you put it, and convert into a tibble
+list_json <- jsonlite::fromJSON("_______/inscriptions.json")
+inscriptions = as_tibble(list_json)
+
+# Check the first couple lines and column names
+____(inscriptions)
+____(inscriptions)
+
+# Wrangle the coordinates into a plottable  format
+i_sm <- inscriptions %>% 
+  slice(1:100) %>% 
+  separate(col = coordinates, into = c("longitude","latitude"), sep = ",") %>%
+  mutate(latitude = as.numeric(__________),
+         longitude = as.numeric(__________)) 
+
+# Check the result of the subset, does the location look reasonable?
+leaflet() %>% addTiles() %>% addMarkers(lng=i_sm$longitude,lat=i_sm$latitude)
+```
+
+Oooof. That was some serious wrangling! 
+
+### Question 2: 
+*Which part of the world are the inscriptions from?*
+
+# Task 5: Convert inscriptions into an sf object
+Now that the hard work is done, let's apply the wrangling to the full dataset and clean up the missing coordinates and outlier values.
+
+* Not all coordinates are complete. Remove the rows with missing latitude or longitude
+* Some incorrect points have sneaked in! Eliminate data with longitude smaller than 5 and larger than 20 degrees.
+* Make the resulting `inscriptions` tibble into an sf object using the newly created and cleaned longitude and latitude column in the `coords` argument. The CRS of the data is 4326.
+* Plot your data using st_geometry()
+
+```{r insc-sf, eval=FALSE}
+i <- inscriptions %>% 
+  separate( __________) %>% 
+  mutate(___________) %>% 
+  filter(____________) %>% 
+  filter(__________) %>% 
+  filter(longitude > 5 && longitude < 20)
+
+
+# Create a sf object
+insc_sf4326 <- st_as_sf(i, coords = ___________, crs = _________)
+
+# Plot
+plot(__________(insc_sf4326))
+```
+
+# Task 6: Select inscriptions that fall into the cities' buffer
+Now that you have both the cities and inscriptions in the same CRS, you can pick the inscriptions which fall within 5km radius of the ancient places in order to locate "urban" inscriptions. Use the inverse st_difference to locate "rural" inscriptions.
+
+To reduce the computational intensity of the final intersection, it is a good idea to limit the dissolved city buffer object only to the area within the convex hull of the inscriptions. For the convex hull, you will need to combine the inscriptions into a MULTIPOINT feature using `st_union()`. 
+
+* Ensure that the spatial reference system in `cities_5km` buffer object and `inscriptions` is consistent.
+* Create a convex hull for the inscriptions after combining them into a MULTIPOINT.
+* Combine the city buffers into a single multipolygon
+* Use `st_intersection()` to clip the inscriptions that fall within the buffer object and assign to `insc_urban` object
+* Use `st_difference` flag to select inscriptions outside these buffers and create `insc_rural` object
+
+```{r intersection, eval=FALSE}
+# Project the sf object into EPSG3035 so it is consistent with cities and their buffers
+insc_sf3035 <- st_transform(________________)
+
+
+# Create a convex hull around the inscriptions's points dissolved into a MULTIPOINT
+insc_ch <- st_convex_hull(_________(insc_sf3035))
+
+# Create a buffer from a cluster of cities that fall within the convex hull 
+cities_it <- st_intersection(insc_ch, _________(cities_5km))
+
+# Dissolve the 399 buffers into a single MULTIPOLYGON buffer feature
+c_buff <- st_union(cities_it)
+
+# Calculate the number of inscriptions in urban and rural areas. This may take a couple seconds
+insc_urban <- ____________(insc_sf3035, c_buff)
+insc_rural <- ____________(insc_sf3035, c_buff)
+```
+
+### Question 3: 
+*What is the ratio of urban to rural inscriptions?*
+
+ 
+# Task 7: CHALLENGE - Duplicates and average distance 
+
+Selecting all peri-urban inscriptions by a united buffer object should work swimmingly if you reduce computational intensity. The result of urban and rural inscriptions should add up to the total inscriptions. 
+However, what if you wanted to compare one city against another in a central Italian region where cities are near one another and their buffers overlap, e.g. Rome versus Ostia? Some of the inscriptions may in such case be counted twice. The best way to eliminate duplicates is to select inscriptions on the basis of Voronyi polygons instead of buffers. But before we rush to another solution, it is perhaps best to first investigate whether such approach is necessary.
+
+Additionally, it's a good idea to check the average distance between inscriptions and cities (points) for all the cities within the convex hull to see how far the inscriptions are on average. Would a small change to the buffer distance dramatically change the urban:rural ratio ?
+
+* Use the `st_intersects()` function and the POLYGON feature of 399 individual buffers to get a list of inscriptions per each of the 399 buffers. * Calculate how many duplicates there are in the list. (hint: `unique()` and `unlist()` functions can help you here). Just as a thought exercise, how would you get around the duplicates?
+* Ensure the `cities` object has the same CRS as `inscriptions`.
+* Clip or select only those cities that fall within the convex hull of inscriptions to reduce the number of calculations. 
+* Calculate the mean distance between the inscriptions and nearest settlement in the subset of cities with `st_distance()` and visually assess the trend. (The subset cities object should be reduced to those cities that fall within the convex hull of inscriptions). 
+
+```{r overcounting and distance, eval=FALSE}
+
+```
+
+
+### Questions 4 - 7: 
+*4. How serious is the overcounting problem?* 
+
+*5. What is the average distance of all inscriptions from all the cities within the convex hull?*
+
+*6. What can you say about the spatial distribution of ancient inscriptions vis-a-vis the cities?* 
+
+*7. What factors might be impacting the distribution?*
+
+
+# Task 8: CHALLENGE - Map all the data with Leaflet
+Let's now look at our inscriptions on some decent background, and remind ourselves how how to load polygons into Leaflet. What kind of CRS does Leaflet use again?
+
+* Remember to use a consistent leaflet-compatible CRS
+* Use `StamenWatercolor` provider tiles to create a simple, pretty map
+* Don't forget `clusterOptions` argument to get a handle on the 12000+ points
+* *Does it make sense to add the cities, too?*
+
+```{r leaflet, eval=FALSE}
+
+leaflet() %>% 
+  addProviderTiles(________) %>% 
+  addCircleMarkers(________)
+  
+```
+
+

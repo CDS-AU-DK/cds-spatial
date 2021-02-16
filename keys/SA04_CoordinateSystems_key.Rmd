@@ -1,0 +1,167 @@
+---
+title: "04 - Coordinate Systems"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Vector and raster coordinate systems
+In order to perform any spatial analysis with more than one layer, your layers should share the same coordinate reference system (CRS) and the first step is determining what coordinate reference system your data has. To do this you can make use of the `sf` function `st_crs()` and the `raster` function `crs()`.
+
+When the geographic data you read in with `sf` already has a CRS defined both `sf` and `raster` will recognize and retain it. When the CRS is not defined you will need to define it yourself using either the EPSG number or the proj4string.
+
+## Instructions
+
+* Ensure the packages `sf` and `raster` and the objects `neighborhoods` and `trees` and `canopy` and `manhattan` are loaded in your workspace.
+* Use `st_crs()` to identify if a CRS exists and what it is for the `trees` and `neighborhoods` objects.
+* Use the `st_crs()` function to define/assign a CRS to the `trees` object.
+* Use `crs()` to identify if a CRS exists and what it is for the `canopy` and `manhattan` objects.
+* Use the `crs()` function to define/assign a CRS to the `manhattan` object.
+
+
+## Solution to task 1
+```{r libraries-and-data,echo=TRUE}
+# Libraries and data
+library(sf)
+library(raster)
+
+# Read in the trees shapefile
+trees <- st_read("data/trees.shp")
+
+# Read in the neighborhood shapefile
+neighborhoods <- st_read("data/neighborhoods.shp")
+
+# Read in the tree canopy single-band raster
+canopy <- raster("data/canopy.tif")
+
+# Read in the manhattan Landsat image multi-band raster
+manhattan <- brick("data/manhattan.tif")
+```
+
+```{r crs-sol, echo=TRUE}
+# Determine the CRS for the neighborhoods and trees vector objects
+st_crs(neighborhoods)
+st_crs(trees)
+
+# Assign the CRS to trees
+crs_1 <- "+proj=longlat +ellps=WGS84 +no_defs"
+st_crs(trees) <- crs_1
+
+# Determine the CRS for the canopy and manhattan rasters
+crs(canopy)
+crs(manhattan)
+
+# Assign the CRS to manhattan
+crs_2 <- "+proj=utm +zone=18 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+crs(manhattan) <- crs_2
+```
+
+Nice! You can determine what the CRS is using `st_crs()` for vectors or `crs()` for rasters. If one doesn't exist, you can also use those functions to define the CRS.
+
+<br>
+
+# Task 2: Transform your layers to a common CRS
+In the previous exercise, when you ran `st_crs()` and `crs()` you may have noticed that the CRS' were different for the different layers. The vector layer's CRS began with `+proj=longlat` and the raster layer's began with `+proj=utm` or `+proj=aea`. In order to use these layers together in spatial analysis we will want them to have the same CRS.
+
+In this exercise you will transform (sometimes this is called "project") the objects so they share a single CRS. It is generally best to perform spatial analysis with layers that have a projected CRS (and some functions require this). To determine if your object has a projected CRS you can look at the first part of the result from `st_crs()` or `crs()` -- **if it begins with `+proj=longlat` then your CRS is unprojected.**
+
+Note that you will use `method = "ngb"` in your call to `projectRaster()` to prevent distortion in the manhattan image.
+
+## Instructions
+
+* Load `sf` and `raster` in your workspace.
+* Use the `crs()` function with argument `asText = TRUE` on the canopy layer to get the CRS as a string and save this as `the_crs`.
+* Use `st_transform()` to transform the vector `trees` object to the CRS in `the_crs`.
+* Use `st_transform()` to transform the vector `neighborhoods` object to the CRS in `the_crs`.
+* Use `projectRaster()` to transform the raster `manhattan` object to the CRS in `the_crs`. This will take a few seconds.
+* Use `st_crs()` on `trees` and `neighborhoods`, and `crs()` on `manhattan` to confirm that they now have the same CRS. They should all have a CRS that starts with `+proj=aea`.* 
+
+## Solution to task 2
+```{r crs-assign-sol, echo=TRUE}
+# Get the CRS from the canopy object
+the_crs <-crs(canopy, asText = TRUE)
+
+# Project trees to match the CRS of canopy
+trees_crs <- st_transform(trees, crs = the_crs)
+
+# Project neighborhoods to match the CRS of canopy
+neighborhoods_crs <- st_transform(neighborhoods, crs = the_crs)
+
+# Project manhattan to match the CRS of canopy
+manhattan_crs <- projectRaster(manhattan, crs = the_crs, method = "ngb")
+
+# Look at the CRS to see if they match
+st_crs(trees_crs)
+st_crs(neighborhoods_crs)
+crs(manhattan_crs)
+```
+
+Great work! This may be the least fun part of spatial analysis but knowing how to do it will save you from a lot of frustration later.
+
+
+# Task 3: Plot vector and raster together
+If the layers do not share a common CRS they may not align on a plot. To illustrate, in this exercise, you will initially create a plot with the `plot()` function and try to add two layers that do not share the same CRS. You will then transform one layer's CRS to match the other and you will plot this with both the `plot()` function and functions from the `tmap` package.
+
+Note that for this exercise we returned all the layers to their original CRS and did not retain the changes you made in the last exercise.
+
+With the `plot()` function you can plot multiple layers on the same map by calling `plot()` multiple times. You'll need to add the argument `add = TRUE` to all calls to `plot()` after the first one and you need to run the code for all layers at once rather than line-by-line.
+
+Make sure `sf`, `raster` and `tmap` are loaded in your workspace.
+
+## Instructions
+
+* Try to plot the neighborhoods object on the `canopy` object with `plot(canopy)` followed by `plot(neighborhoods, add = TRUE)`. Do you see the neighborhoods?
+* Use `st_crs()` on the `neighborhoods` layer and `crs()` on the `canopy` layer to see if they share a CRS.
+* Save the CRS of the `canopy` layer as a new object called `the_crs`. You should use `crs()` with the `asText = TRUE argument`.
+* Use `st_transform()` to transform the `neighborhoods` CRS to match the `canopy` layer.
+* Re-run the `plot()` code from the instruction above. Do you see the neighborhoods now?
+* Run the given `tmap` code.
+
+
+## Solution to task 3
+```{r plot-sol, echo=TRUE}
+# Plot canopy and neighborhoods (run both lines together)
+# Do you see the neighborhoods?
+plot(canopy);plot(neighborhoods, add = TRUE)
+
+# See if canopy and neighborhoods share a CRS
+st_crs(neighborhoods)
+crs(canopy)
+
+# Save the CRS of the canopy layer
+the_crs <- crs(canopy, asText = TRUE)
+
+# Transform the neighborhoods CRS to match canopy
+neighborhoods_crs <- st_transform(neighborhoods, crs = the_crs)
+
+# Re-run plotting code (run both lines together)
+# Do the neighborhoods show up now?
+plot(canopy);plot(neighborhoods_crs, add = TRUE)
+
+# Simply run the tmap code
+library(tmap)
+tm_shape(canopy) + 
+    tm_raster() + 
+    tm_shape(neighborhoods_crs) + 
+    tm_polygons(alpha = 0.5)
+```
+
+Great work! As you noticed, you mostly can't plot layers together if they don't have the same CRS. You'll see later that there are exceptions but it is definitely best practice to ensure the layers you'll work with have a common, projected CRS.
