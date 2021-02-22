@@ -1,0 +1,224 @@
+---
+title: "11 - Raster Analysis"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r format(Sys.time(), '%B %d, %Y')`" 
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(sf)
+library(raster)
+
+
+# Read in the trees shapefile
+trees <- st_read("data/trees.shp")
+
+# Read in the neighborhood shapefile
+neighborhoods <- st_read("data/neighborhoods.shp")
+
+landmarks <- 
+
+# Read in the tree canopy single-band raster
+canopy <- raster("data/canopy.tif")
+
+# Read in the manhattan Landsat image multi-band raster
+manhattan <- brick("data/manhattan.tif")
+
+# Read in the impervious single-band raster
+impervious <- raster("data/impervious.tif")
+```
+
+
+# Task 1: Limit rasters to focus areas
+Mask and crop are similar operations that allow you to limit your raster to a specific area of interest. With `mask()` you essentially place your area of interest on top of the raster and any raster cells outside of the boundary are assigned NA values. A reminder that currently the `raster` package does not support `sf` objects so they will need to be converted to `Spatial` objects with, for example, `as(input, "Spatial")`.
+
+## Instructions I
+
+* Create `parks` object from shapefile ("parks.shp")
+* Project the `parks` object to match the canopy raster with `st_transform()` and `crs()`. Assign this to `parks_cp`.
+* Compute the area of the parks with `st_area()` and save this object as `areas`.
+* Filter the parks to only those above 30000 square meters with the `filter()` function. You will need to wrap `areas` in `unclass()`. Save as `parks_big`. Remember to have the tidyverse or dplyr library attached for `filter()` to work properly.
+
+```{r filter-area, eval=FALSE, echo=TRUE}
+# Read in the parks object
+parks <- ___(___)
+
+# Project parks to match canopy
+parks_cp <- ___(parks, crs = ___(canopy, asText = TRUE))
+
+# Compute the area of the parks
+areas <- ___(parks_cp)
+
+# Filter to parks with areas > 30000
+parks_big <- ___(parks_cp, ___ > 30000)
+
+# Plot the canopy raster
+plot(canopy)
+
+# Plot the geometry of parks_big
+___(___(parks_big))
+
+# Convert parks to a Spatial object
+parks_sp <- ___(parks_big, "Spatial")
+
+# Mask the canopy layer with parks_sp and save as canopy_mask
+canopy_mask <- ___(___, mask = parks_sp)
+```
+
+
+## Instructions II
+
+* Review the plot of `canopy` raster.
+* Plot the geometry of the `parks_big`.
+* Convert the `parks_big` object to the `Spatial` class (the class from the package `sp`) with `as(input, "Spatial")` and save this as `parks_sp`.
+* Mask the `canopy` layer with `parks_sp` and save as `canopy_mask`. This may take a couple of seconds.
+* Review the plot of `canopy_mask`.
+```{r plot-canopy, eval=FALSE}
+# Plot the canopy raster
+plot(________)
+
+# Plot the geometry of parks_big
+plot(_________(parks_big))
+
+# Convert parks to a Spatial object
+parks_sp <- as(parks_big, _____)
+
+# Mask the canopy layer with parks_sp and save as canopy_mask
+canopy_mask <- ________(canopy, mask = parks_sp)
+
+# Plot canopy_mask -- this is a raster!
+plot(canopy_mask)
+```
+
+
+Nice! You transformed coordinates so that layers had the same CRS, you computed areas and filtered. You converted to a Spatial object and, finally, you used `mask()` to mask the canopy raster to the large parks.
+
+
+## Extra task:
+sf should now be able to handle `raster::mask` and `raster::crop` without needing to convert/coerce the vector into a Spatial* or Raster* object. 
+Test the proposed functions and report back: is the masking and cropping result the same without converting to `Spatial` object? 
+https://stackoverflow.com/questions/42927384/r-handling-of-sf-objects-in-raster-package
+
+
+# Task 2: Crop a raster based on another spatial object
+As you saw in the previous exercise with `mask()`, the raster extent is not changed. If the extents of the input raster and the mask itself are different then they will still be different after running `mask()`. In many cases, however, you will want your raster to share an extent with another layer and this is where `crop()` comes in handy. With `crop()` you are cropping the raster so that the extent (the bounding box) of the raster matches the extent of the input crop layer. But within the bounding box no masking is done (no raster cells are set to `NA`).
+
+In this exercise you will both mask and crop the NYC canopy layer based on the large parks and you'll compare. You should notice that the masked raster includes a lot of `NA` values (they are the whitespace) and that the extent is the same as the original canopy layer. With the cropped layer you should notice that the extent of the cropped canopy layer matches the extent of the large parks (essentially it's zoomed in).
+
+## Instructions
+
+* Convert the `parks_big` layer (from the preceding exercise, it is limited to large parks and projected) to a `Spatial` object with `as()` -- call this `parks_sp`.
+* First mask the `canopy` layer using `mask()` and call this `canopy_mask` as you did in the previous exercise. This may take a couple of seconds.
+* Plot the `canopy_mask` object.
+* Crop the `canopy` layer using the `parks_sp` layer with `crop()`.
+* Plot the cropped layer and see how the edges go right to the axis lines. Toggle between the plots to compare them.
+
+```{r raster-crop, eval=FALSE, echo=TRUE}
+# Convert the parks_big to a Spatial object
+parks_sp <- ___(parks_big, ___)
+
+# Mask the canopy with the large parks 
+canopy_mask <- ___(canopy, mask = parks_sp)
+
+# Plot the mask
+___
+
+# Crop canopy with parks_sp
+canopy_crop <- ___(___, parks_sp)
+
+# Plot the cropped version and compare
+___(canopy_crop)
+```
+
+
+Great work, now you should know the difference between mask and crop. With mask the extents remain unchanged but all raster values outside the mask are set to `NA`. With crop the raster extent is cropped to match the other layer.
+
+
+# Task 3: Extract raster values by location
+Beyond simply masking and cropping you may want to know the actual cell values at locations of interest. You might, for example, want to know the percentage canopy at your landmarks or within the large parks. This is where the `extract()` function comes in handy.
+
+Usefully, and you'll see this in a later analysis, you can feed `extract()` a function that will get applied to extracted cells. For example, you can use `extract()` to extract raster values by neighborhood and with the `fun = mean` argument it will return an average cell value by neighborhood.
+
+Similar to other `raster` functions, it is not yet set up to accept `sf` objects so you'll need to convert to a `Spatial` object.
+
+## Instructions
+
+* Create `landmarks` object out of the provided dataframe with `st_as_sf()`.
+* Project the `landmarks` points to match the `canopy` CRS. 
+* Use the `raster` function `extract()` to determine the percentage of tree canopy at each of the three points. Save this as `landmarks_ex`.
+* Look at the `landmarks_cp` and `landmarks_ex` objects in the console. Do the `extract()` results make sense? The `canopy` layer values represent percentage tree canopy.
+
+```{r extract, eval=FALSE}
+# Create a landmarks dataframe
+ldf <- data.frame(place = c("Empire State Building", "Museum of Natural History", "Central Park (The Ramble)"),
+                 longitude=c(-73.98566,-73.97398, -73.96964),
+                 latitude=c(40.74844,40.78132, 40.77734))
+
+# Convert the data frame to an sf object             
+landmarks <- _____(ldf, coords = c("longitude", "latitude"), crs =4326)
+
+# Project the landmarks to match canopy
+landmarks_cp <- ___(landmarks, ___ = ___(canopy, ___ = ___))
+
+# Extract the canopy values at the landmarks
+landmarks_ex <- _______::______(canopy, landmarks_cp)
+
+# Look at the landmarks and extraction results
+landmarks_cp
+landmarks_ex 
+```
+
+
+Great! `extract()` is a very useful tool and you'll see later it can be used with polygons as well as points. The Empire State Building is in a very urban area of NYC, the museum area is less urban but still urban and Central Park is wooded. The results confirm this. There is no tree canopy near the Empire State Building, 18.22% at the Museum of Natural History and 63.96% at Central Park.
+
+
+# Task 4: Raster math with overlay
+You will now use the `canopy` layer and an "imperviousness" layer from the same source, the United States Geological Survey. Imperviousness measures whether water can pass through a surface. So a high percentage impervious surface might be a road that does not let water pass through while a low percentage impervious might be something like a lawn.
+
+What you will do in this exercise is essentially identify the most urban locations by finding areas that have both a low percentage of tree canopy ([removed] 80%). To do this, we defined the function `f` to do the raster math for you.
+
+## Instructions
+
+* Read in the canopy layer ("canopy.tif", it is a single-band raster).
+* Read in the imperviousness layer ("impervious.tif", it is also a single-band raster).
+* Call `overlay()` on `canopy` and `impervious`. Set the `fun` argument to `f`.
+* Plot the result of the overlay, the areas shown should be highly urban areas.
+
+```{r overlay, eval=FALSE, echo=TRUE}
+# Read in the canopy and impervious layer
+canopy <- ___(___)
+impervious <- ___(___)
+
+# Function f with 2 arguments and the raster math code
+f <- function(rast1, rast2) {
+  rast1 < 20 & rast2 > 80
+}
+
+# Do the overlay using f as fun
+canopy_imperv_overlay <- ___(canopy, ___, fun = ___)
+
+# Plot the result (low tree canopy and high impervious areas)
+___(canopy_imperv_overlay)
+```
+
+
+Congratulations! You've now learned to perform raster math using the raster function `overlay()`. You limited to areas with < 20% tree canopy and > 80% impervious, these areas will be the most urban areas of the city including parts of Manhattan and Brooklyn.
