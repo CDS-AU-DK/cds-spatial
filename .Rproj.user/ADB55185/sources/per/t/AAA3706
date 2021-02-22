@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1612261762237.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3738238117",
+    "id" : "AAA3706",
+    "lastKnownWriteTime" : 1612262169,
+    "last_content_update" : 1612262169860,
+    "path" : "~/RStudio/1_Teaching/Leaflet/DKmap.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "14,28",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
