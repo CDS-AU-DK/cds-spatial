@@ -1,0 +1,191 @@
+---
+title: "10 - Multi-layer geoprocessing and relationships"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r format(Sys.time(), '%B %d, %Y')`" 
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(sf)
+library(raster)
+
+# Read in the trees shapefile
+trees <- st_read("data/trees.shp")
+
+# Read in the beech shapefile
+beech <- st_read("data/beech.shp")
+
+# Read in the neighborhood shapefile
+neighborhoods <- st_read("data/neighborhoods.shp")
+
+# Read in the tree canopy single-band raster
+canopy <- raster("data/canopy.tif")
+
+# Read in the manhattan Landsat image multi-band raster
+manhattan <- brick("data/manhattan.tif")
+
+# Project neighborhood shapefile to canopy
+neighborhoods_crs <- st_transform(neighborhoods, crs = crs(canopy))
+```
+
+# Task 1: Spatial joins
+For many analysis types you need to link geographies spatially. For example, you want to know how many trees are in each neighborhood but you don't have a neighborhood attribute in the tree data. The best way to do this is with a spatial join using `st_join()`.
+
+Importantly, the `st_join()` function requires `sf` data frames as input and will not accept an object that is just `sf` geometry. You can use the `st_sf()` function to convert `sf` geometry objects to an sf data frame (`st_sf()` is essentially the opposite of `st_geometry()`).
+
+## Instructions
+
+* Plot the beech trees (`beech`) on top of the neighborhoods (`neighborhoods`). You will want to plot only the geometry of the neighborhoods.
+* Use `class()` to see if the beech object has class `data.frame` or if it's just geometry.
+* Convert the `sf` geometry object `beech` to an sf data frame with `st_sf()`.
+* Use `class()` to confirm that `beech` now has a class of data.frame (as well as sf).
+* Use `st_join()` to conduct a spatial join in order to add neighborhood information to the beech object.
+* Use `head()` to confirm that the new object has neighborhood information -- for example, it should now have neighborhood name (`ntaname`).
+
+
+## Solution to task 1
+```{r beech-neighbor-sol, echo=TRUE}
+# Plot the beech on top of the neighborhoods
+plot(st_geometry(neighborhoods))
+plot(beech, add = TRUE, pch = 16, col = "red")
+
+# Determine whether beech has class data.frame
+class(beech)
+
+# Convert the beech geometry to a sf data frame
+beech_df <- st_sf(beech)
+
+# Confirm that beech now has the data.frame class
+class(beech_df)
+
+# Join the beech trees with the neighborhoods
+beech_neigh <- st_join(beech_df, neighborhoods)
+
+# Confirm that beech_neigh has the neighborhood information
+head(beech_neigh)
+```
+
+Great! The beech tree object did not have neighborhood information until you performed the spatial join with `st_join()`. Now that the neighborhood information is included you would be able to tabulate the count of trees by neighborhood (you will do this later).
+
+# Task 2: Spatial relationships
+In this exercise you will determine which neighborhoods are at least partly within 2000 meters of the Empire State Building with `st_intersects()` and those that are completely within 2000 meters of the Empire State Building using `st_contains()`. You will then use the `st_intersection()` function (notice the slight difference in function name!) to **clip** the neighborhoods to the buffer.
+
+A note about the output of functions that test relationships between two sets of features. The output of these and related functions is a special kind of list (with the class `sgbp`). For example, when using `st_intersects()`, the first element in the output can be accessed using `[[1]]`, which shows polygons from the second polygon that intersect with the first polygon. Likewise, `[[2]]` would show the polygons from from the first polygon that intersect with the second polygon.
+
+## Instructions
+
+* Create a point out of Empire State Building lat/long coordinates and assign to `empire_state`. 
+* Define the projection of `empire_state` to EPSG 4326 and then transform to `canopy`.
+* Create a 2000 m buffer around `empire_state` using `dist` argument and assign the result to `buf`. 
+* Use `st_intersects()` to identify `neighborhoods` that intersect with the buffer object (`buf`) and call the result `neighborhoods_int`.
+* Use `st_contains()` to identify `neighborhoods` that are completely within the buffer object (`buf`) and call the result `neighborhoods_cont`.
+* Extract `neighborhoods` that are contained by and intersect with `buf` and save as `int` and `cont`.
+* Use the `int` object you just created to identify the names of the neighborhoods that intersect with buffer (the first will be Clinton).
+* Use `st_intersection()` to "clip" the neighborhoods by `buf` and call this `neighborhoods_clip`.
+
+
+## Solution to task 2
+```{r intersect-sol, echo = TRUE}
+# Create empire state building, set the projection to 4326, and transform to be consistent with canopy or crs_1
+empire_state <- st_sfc(st_point(c(-73.985656, 40.748433))) %>% 
+  st_set_crs(4326) %>% 
+  st_transform(crs = st_crs(canopy))
+
+# Create a buffer
+buf <- st_buffer(empire_state, dist = 2000) 
+plot(neighborhoods_crs$geometry);
+plot(buf, col = "red", add = TRUE)
+plot(empire_state, add = TRUE)
+
+# Check alignment and reproject neighborhoods if needed
+st_crs(neighborhoods_crs)== st_crs(empire_state)
+
+# Identify neighborhoods that intersect with the buffer
+neighborhoods_int <- st_intersects(buf, neighborhoods_crs)
+
+# Identify neighborhoods contained by the buffer
+neighborhoods_cont <- st_contains(buf, neighborhoods_crs)
+
+# Get the indexes of which neighborhoods intersect
+# and are contained by the buffer
+int <- neighborhoods_int[[1]]
+cont <- neighborhoods_cont[[1]]
+
+# Get the names of the names of neighborhoods in buffer
+neighborhoods_crs$ntaname[int]
+
+# Clip the neighborhood layer by the buffer
+neighborhoods_clip <- st_intersection(buf, neighborhoods_crs)
+
+# Plot the geometry of the clipped neighborhoods
+plot(st_geometry(neighborhoods_clip), col = "red")
+plot(st_geometry(neighborhoods_crs[cont,]), add = TRUE, col = "yellow")
+```
+
+#### Questions: 
+1. What is the class of the object produced via `st_intersects()`?
+2. Why do we need to use `neighborhoods[cont,]` to view the fully contained neighborhood in the buffer plot?
+
+The `sf` package has quite a few different functions for determining relationships. You used `st_intersects()` and `st_contains()` here but there are others as well and what you use will depend on what relationships you're looking at. In this exercise you also used the important `st_intersection()` function to clip one layer based on another.
+
+# Task 3: Measuring distance between features
+Of course, measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
+
+In this exercise you'll measure the distance from the Empire State Building to all the parks and identify the closest one.
+
+## Instructions
+
+* Read in the parks shapefile ("parks.shp").
+* Test whether the CRS of `parks` matches the CRS of the preloaded object `empire_state` with `st_crs()`.
+* Project/transform the parks object to match the empire_state object. You'll need `st_transform()` and `st_crs()`.
+* Use `st_distance()` to compute the distance between the Empire State Building (empire_state) and the parks.
+* Use `head()` to take a quick look at the result.
+* Identify the index of the smallest distance using `which.min()` and assign it to nearest.
+* Use `nearest` to pull out the row from `parks` of the nearest park (see the `signname` variable, it should be Greeley Square Park).
+
+
+## Solution to task 3
+```{r nearest-sol, include=TRUE}
+# Read in the parks object
+parks <- st_read("data/parks.shp")
+
+# Test whether the CRS match
+st_crs(empire_state) == st_crs(parks)
+
+# Project parks to match empire state
+parks_es <- st_transform(parks, crs = st_crs(empire_state))
+
+# Compute the distance between empire_state and parks_es
+d <- st_distance(empire_state, parks_es)
+
+# Take a quick look at the result
+head(d)
+
+# Find the index of the nearest park
+nearest <- which.min(d)
+
+# Identify the park that is nearest
+parks_es[nearest, ]$signname
+
+```
+
+Nice work! If you look at the result for the last line of code carefully you'll see that the closest park is Greeley Square Park, it's just around the corner from the Empire State Building. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix.

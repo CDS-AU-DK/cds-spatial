@@ -107,11 +107,7 @@ library(leaflet)
 
 places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=0",col_types = "cccnncn")
 glimpse(places)
-places <- places %>% filter(!is.na(Longitude))
-
-gs4_auth_configure()
-gs4_has_token()
-
+places <- places %>% filter(!is.na(Longitude) && !is.na(Latitude))
 
 MapDK %>% 
   addCircleMarkers(lng = places$Longitude, 
@@ -121,7 +117,7 @@ MapDK %>%
 
 #########################################################
 #
-# Task 1: Create a Danish equivalent with esri layers
+# Task 1: Create a Danish equivalent MapDK with esri layers
 # Task 2: Read in the googlesheet data you and your colleagues populated with data. 
 # The googlesheet is at https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=0
 
