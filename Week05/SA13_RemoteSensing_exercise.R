@@ -7,11 +7,11 @@
 
 #### Goals ####
 
-# - learn to work with satellite imager
-# - extract data from and create new data from sat img
+# - learn to work with satellite imagery in the landsat package
+# - extract and create new data from images
 # - segment features in satellite imagery
 
-### 1. Sit back and start by installing the required packages first. 
+### 1. Start by installing the required packages first. 
 # these are not on worker2, sorry!
 install.packages(c("rasterVis", 
                    "RColorBrewer", 
@@ -24,7 +24,7 @@ install.packages(c("rasterVis",
 ### 2. Pre-processing Landsat datasets 
 library(landsat)
 
-##loading image data from landsat package
+##loading indvidual band image data from landsat package
 ?nov
 
 #loading band#3 red channel of the image
@@ -36,7 +36,7 @@ plot(nov4)
 # colors in plot vary from 0 (black) to 255 (white). Normal colors are between.
 
 
-#####     Libraries needed
+###   Libraries needed
 
 library(lattice)
 library(latticeExtra)
@@ -45,14 +45,16 @@ library(rasterVis)
 library(rgdal)
 library(rgl)
 
+# load and plot the dem in landsat package
 data(dem)
 plot(dem)
 dem <- raster(dem)
 
+# this neat 3D viewer opens in a new window
 plot3D(dem, rev=T, zfac=1)
 
 
-### lets create an RGB image and drape it over the 3D model
+### let's create an RGB image and drape it over the 3D model
 data("july1")
 data("july2")
 data("july3")
@@ -62,17 +64,20 @@ j2<-raster(july2) # green
 j3<-raster(july3) # red
 j4<-raster(july4) # near-infrared
 
-## check out the histogram	
+## check out the image histogram	
 plot(j1)
 hist(j1, main="Band 1 - Blue of Landsat")	
 boxplot(j1, main="Band 1 - Blue of Landsat")		
 
-### scatter plot matrix (from lattice)
-splom(myCIR, varname.cex=1)
 
-### Reorder to R - G - B and create a multi-layer rasterbrick !
+### Reorder to R - G - B and create a multi-layer rasterBrick !
 myRGB <-	brick(j3,j2,j1) # brick creates new object
 myCIR <-	stack(j4,j3,j2) # stack stores connections only
+
+
+### let's see how the NIR, R, and G bands relate  (from lattice)
+splom(myCIR, varname.cex=1) # scatter plot matrix
+
 
 # let´s plot in full colour!
 plot(myRGB)
@@ -159,10 +164,6 @@ par(mfrow=c(1,2))
 plot(savi, main="SAVI");plot(ndvi, main="NDVI")
 par(mfrow=c(1,1))
 
-### you can compare formally (let's skip for now)
-library(spatialEco)
-r.cor <- rasterCorrelation(savi, ndvi, s = 5, type = "spearman")
-plot(r.cor)
 
 ### Let´s make a new brick, including DEM and NDVI
 data(nov2)
@@ -215,11 +216,11 @@ plot(se,axes=T,add=T)
 
 
 ### when we reproject the data to geographical coordinates...
-se # it is a Spatial object
+se      # it is a Spatial object
 crs(se) # what is its crs?
 se.ll <- spTransform(se,CRS( "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "))
 
-### then we can combine them with leaflet
+### ...then we can combine them with leaflet
 
 library(leaflet)
 leaflet() %>% 
@@ -237,13 +238,13 @@ r.se<-itcIMG(r,epsg=25829, ischm=T) ### slow on my laptop (solid 2-3mins)!!!
 summary(r.se)
 plot(r);plot(r.se,axes=T, add=TRUE)
 
-# Adjust for excessive capture of small growth
-r.se5<-itcIMG(r,epsg=25829,th = 5, ischm=T) ### slow on my laptop (solid 2-3mins)!!!
+# Adjust 'th' argument for excessive capture of small growth
+r.se5<-itcIMG(r,epsg=25829,th = 5, ischm=T) # th - how low should algorithm be looking for canopy
 plot(r);plot(r.se5,axes=T, add=TRUE)
 
 # Write the result to shapefile
-?writeOGR
 library(rgdal)
+?writeOGR
 td <- getwd()
 writeOGR(r.se,td,"itcTrees_subset",driver="ESRI Shapefile" )
 
@@ -258,7 +259,7 @@ leaflet() %>%
   addProviderTiles("Esri.WorldPhysical") %>% 
  # addProviderTiles("Esri.WorldImagery") %>% 
   addRasterImage(projectRaster(r, crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ")) %>% 
-  addPolygons(data=rse.ll, weight = 1, color = "black" )   # Tadaa
+  addPolygons(data=rse.ll, weight = 1, color = "black" )   # Neat :)
 
 
 ### End.
