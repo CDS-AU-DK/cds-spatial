@@ -38,10 +38,12 @@ Although, technically you can buffer data with unprojected coodinate reference s
 * Plot the manhattan image, and the geometries of buffers and points together. This will require running `plotRGB()`, `plot()`, and `plot()` again, all together.
 
 ```{r buffer, eval=FALSE}
-# Create df
-df <- data.frame(place = c("Empire State Building", "Museum of Natural History"),
-                 longitude=c(-73.98566,-73.97398),
-                 latitude=c(40.74844,40.78132))
+
+library(sf,raster)
+
+
+# Review df
+df
 
 # Convert the data frame to an sf object             
 df_sf <- ___(df, coords = c("longitude", "latitude"), ___)

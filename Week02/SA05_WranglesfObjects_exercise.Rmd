@@ -192,3 +192,7 @@ ___(new_trees)
 ```
 
 Great, working with coordinates by turning them into `sf` objects or writing out to a data frame is a critical skill in spatial analysis. Note that `st_write()` can also be used to write lines and polygons but it wouldn't make sense to write these out with coordinates in the same format.
+```{r}
+st_read("../")
+```
+
