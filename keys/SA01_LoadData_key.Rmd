@@ -96,10 +96,10 @@ Now you've learned how to read in single and multi-band rasters. You should have
 library(raster)
 
 # Read in the tree canopy single-band raster
-canopy <- raster("data/canopy.tif")
+canopy <- raster("../Week02/canopy.tif")
 
 # Read in the manhattan Landsat image multi-band raster
-manhattan <- brick("data/manhattan.tif")
+manhattan <- brickse("data/manhattan.tif")
 
 # Get the class for the new objects
 class(canopy)
