@@ -35,8 +35,6 @@ trees <- st_read("data/trees.shp")
 # Read in the neighborhood shapefile
 neighborhoods <- st_read("data/neighborhoods.shp")
 
-landmarks <- 
-
 # Read in the tree canopy single-band raster
 canopy <- raster("data/canopy.tif")
 

@@ -54,8 +54,8 @@ canopy <- _____
 # Read in the manhattan Landsat image multi-band raster
 manhattan <- _____
 
-# Compute the counts of all trees by hood
-tree_counts <- ___(trees, hood)
+# Compute the counts of all trees by nta
+tree_counts <- ___(trees, nta)
 
 # Take a quick look
 ___(tree_counts)
