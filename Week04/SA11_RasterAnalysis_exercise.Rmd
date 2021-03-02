@@ -35,7 +35,7 @@ trees <- st_read("data/trees.shp")
 # Read in the neighborhood shapefile
 neighborhoods <- st_read("data/neighborhoods.shp")
 
-landmarks <- 
+#landmarks <- 
 
 # Read in the tree canopy single-band raster
 canopy <- raster("data/canopy.tif")
@@ -60,28 +60,28 @@ Mask and crop are similar operations that allow you to limit your raster to a sp
 
 ```{r filter-area, eval=FALSE, echo=TRUE}
 # Read in the parks object
-parks <- ___(___)
+parks <- st_read("data/parks.shp")
 
 # Project parks to match canopy
-parks_cp <- ___(parks, crs = ___(canopy, asText = TRUE))
+parks_cp <- st_transform(parks, crs = crs(canopy, asText = TRUE))
 
 # Compute the area of the parks
-areas <- ___(parks_cp)
+areas <- st_area(parks_cp)
 
 # Filter to parks with areas > 30000
-parks_big <- ___(parks_cp, ___ > 30000)
+parks_big <- filter(parks_cp, unclass(areas) > 30000)
 
 # Plot the canopy raster
 plot(canopy)
 
 # Plot the geometry of parks_big
-___(___(parks_big))
+plot(st_geometry(parks_big))
 
 # Convert parks to a Spatial object
-parks_sp <- ___(parks_big, "Spatial")
+parks_sp <- as(parks_big, "Spatial")
 
 # Mask the canopy layer with parks_sp and save as canopy_mask
-canopy_mask <- ___(___, mask = parks_sp)
+canopy_mask <- mask(canopy, mask = parks_sp)
 ```
 
 
@@ -94,16 +94,16 @@ canopy_mask <- ___(___, mask = parks_sp)
 * Review the plot of `canopy_mask`.
 ```{r plot-canopy, eval=FALSE}
 # Plot the canopy raster
-plot(________)
+plot(canopy)
 
 # Plot the geometry of parks_big
-plot(_________(parks_big))
+plot(st_geometry(parks_big))
 
 # Convert parks to a Spatial object
-parks_sp <- as(parks_big, _____)
+parks_sp <- as(parks_big, "Spatial")
 
 # Mask the canopy layer with parks_sp and save as canopy_mask
-canopy_mask <- ________(canopy, mask = parks_sp)
+canopy_mask <- mask(canopy, mask = parks_sp)
 
 # Plot canopy_mask -- this is a raster!
 plot(canopy_mask)
@@ -134,19 +134,20 @@ In this exercise you will both mask and crop the NYC canopy layer based on the l
 
 ```{r raster-crop, eval=FALSE, echo=TRUE}
 # Convert the parks_big to a Spatial object
-parks_sp <- ___(parks_big, ___)
+parks_sp <- as(parks_big, "Spatial")
 
 # Mask the canopy with the large parks 
-canopy_mask <- ___(canopy, mask = parks_sp)
+canopy_mask <- mask(canopy, mask = parks_sp)
 
 # Plot the mask
-___
+plot(canopy_mask)
 
 # Crop canopy with parks_sp
-canopy_crop <- ___(___, parks_sp)
+canopy_crop <- crop(canopy, parks_sp)
 
 # Plot the cropped version and compare
-___(canopy_crop)
+plot(canopy)
+plot(canopy_crop)
 ```
 
 
@@ -174,13 +175,13 @@ ldf <- data.frame(place = c("Empire State Building", "Museum of Natural History"
                  latitude=c(40.74844,40.78132, 40.77734))
 
 # Convert the data frame to an sf object             
-landmarks <- _____(ldf, coords = c("longitude", "latitude"), crs =4326)
+landmarks <- st_as_sf(ldf, coords = c("longitude", "latitude"), crs =4326)
 
 # Project the landmarks to match canopy
-landmarks_cp <- ___(landmarks, ___ = ___(canopy, ___ = ___))
+landmarks_cp <- st_transform(landmarks, crs = crs(canopy, asText = T))
 
 # Extract the canopy values at the landmarks
-landmarks_ex <- _______::______(canopy, landmarks_cp)
+landmarks_ex <- raster::extract(canopy, landmarks_cp)
 
 # Look at the landmarks and extraction results
 landmarks_cp
@@ -205,8 +206,8 @@ What you will do in this exercise is essentially identify the most urban locatio
 
 ```{r overlay, eval=FALSE, echo=TRUE}
 # Read in the canopy and impervious layer
-canopy <- ___(___)
-impervious <- ___(___)
+canopy <- raster("data/canopy.tif")
+impervious <- raster("data/impervious.tif")
 
 # Function f with 2 arguments and the raster math code
 f <- function(rast1, rast2) {
@@ -214,10 +215,10 @@ f <- function(rast1, rast2) {
 }
 
 # Do the overlay using f as fun
-canopy_imperv_overlay <- ___(canopy, ___, fun = ___)
+canopy_imperv_overlay <- overlay(canopy, impervious, fun = f)
 
 # Plot the result (low tree canopy and high impervious areas)
-___(canopy_imperv_overlay)
+plot(canopy_imperv_overlay)
 ```
 
 
