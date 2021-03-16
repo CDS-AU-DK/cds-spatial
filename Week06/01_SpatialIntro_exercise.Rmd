@@ -27,10 +27,10 @@ Firstly, you'll generate 200 points uniformly in a rectangle. The rectangle will
 
 ```{r point generation, eval = FALSE}
 n = 200
-xmin <- 
-xmax <- 
-ymin <- 
-ymax <- 
+xmin <- 0
+xmax <- 1
+ymin <- 0
+ymax <- 2
 x = runif(n, xmin, xmax)
 y = runif(n, ymin, ymax)
 ```
@@ -59,10 +59,10 @@ ls.str()
 plot(x,y)
 
 mapxy <- function(a = NA){
-  plot(_, _, asp = a)
+  plot(x, y, asp = a)
   rect(xmin, ymin, xmax, ymax)
 }
-mapxy(__)
+mapxy(1)
 ```
 
 Aha! Forcing the aspect ratio to 1 should prevent distortion of areas.
@@ -85,22 +85,22 @@ The number of points to generate and the circle's radius are shown in the script
 
 ```{r circle, eval = FALSE}
 # Load the spatstat package
-___
+library(spatstat)
 # Create this many points, in a circle of this radius
 n_points <- 300
 radius <- 10
 
 # Generate uniform random numbers up to radius-squared
-r_squared <- runif(___, ___, ___)
+r_squared <- runif(n_points, 0, radius^2)
 
 # runif(n_points, 0, radius)
 angle <- runif(n_points, 0, 2*pi)
 
 # Take the square root of the values to get a uniform spatial distribution
-x <- ___ * ___
-y <- ___ * ___
+x <- sqrt(r_squared) * cos(angle)
+y <- sqrt(r_squared) * sin(angle)
 
-plot(___); points(x, y)
+plot(disc(radius)); points(x, y)
 ```
 Dazzling disc drawing! The `disc()` function in `spatstat` conveniently lets you plot a disc.
 
@@ -130,14 +130,14 @@ radius <- 10
 summary(x)
 
 # Set coordinates and window
-ppxy <- ppp(x = ___, y = ___, window = ___)
+ppxy <- ppp(x = x, y = y, window = disc(radius))
 
 # Test the point pattern
-qt <- ___(___)
+qt <- quadrat.test(ppxy)
 
 # Inspect the results
-plot(___)
-print(___)
+plot(qt)
+print(qt)
 ```
 
 # Task 5: Creating a uniform point pattern with spatstat
@@ -161,16 +161,16 @@ The `area.owin()` function of `spatstat` will compute the area of a window such 
 
 ```{r ppoisson, eval=FALSE}
 # Create a disc of radius 10
-disc10 <- ___
+disc10 <- disc(radius)
 
 # Compute the rate as count divided by area
-lambda <- ___ / ___
+lambda <- 500 / area.owin(disc10)
 
 # Create a point pattern object
-ppois <- rpoispp(lambda = ___, win = ___)
+ppois <- rpoispp(lambda = lambda, win = disc10)
 
 # Plot the Poisson point pattern
-___
+plot(ppois)
 ```
 <br>
 Perfect Poisson process plotting! Poisson processes generate completely spatially random points. Next you'll see some other processes for generating random points.
@@ -198,23 +198,23 @@ Conversely the points of a *Strauss* process cause a lowering in the probability
 
 ```{r clustering,eval= FALSE}
 # Create a disc of radius 10
-disc10 <- ___
+disc10 <- disc(10)
 
 # Generate clustered points from a Thomas process
 set.seed(123)
-p_cluster <- ___(kappa = 0.35, scale = 1, mu = 3, win = ___)
+p_cluster <- rThomas(kappa = 0.35, scale = 1, mu = 3, win = disc10)
 plot(p_cluster)
 
 # Run a quadrat test
-___(p_cluster, alternative = "___")
+quadrat.test(p_cluster, alternative = "clustered")
 
 # Regular points from a Strauss process
 set.seed(123)
-p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = ___)
+p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = disc10)
 plot(p_regular)
 
 # Run a quadrat test
-___
+quadrat.test(p_regular, alternative = "regular")
 ```
 
 
