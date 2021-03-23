@@ -38,23 +38,21 @@ library(googlesheets4)
 library(leaflet)
 ```
 
+## Spatial data
 Next, load your spatial data - polygons representing the suburbs of Copenhagen. 
 ```{r}
-suburbs <- st_read("data/bydel.shp")
+suburbs <- st_read("data/bydel.shp", options = "ENCODING=WINDOWS-1252") # thank you, Malte, for the options argument which fixed the Danish chars
+
 plot(suburbs$geometry)
 tail(suburbs)
 #write_rds(suburbs, "data/CPHsuburbs.rds")
 
 suburbs$id
-#Clean up suburb names
-suburbs$navn
 
-# suburbs %>% 
-#   select(navn) %>% 
-#   mutate(Name=gsub("<f8>|<d8>","oe",navn))
 ```
-Next attach the attribute data. 
-I read the data from a google sheet where my colleagues and I can edit it. You can load it from there if you have a googlesheets4 package installed, or use the wc.csv in the data folder
+## Attribute data
+Next let's bring in the attribute data. 
+I read the data from a google sheet where my colleagues and I can edit it. You can load it from there if you have a `googlesheets4` package installed, or you can use the `read_csv()` function to read the `wc.csv` provided in the data folder
 ```{r read-wc}
 # Uncomment the lines below to read data from GDrive
 # wc <- read_sheet("https://docs.google.com/spreadsheets/d/1iFvycp6M6bF8GBkGjA2Yde2yCIhiy5_slAkGF-RUF7w/edit#gid=0",
@@ -63,8 +61,10 @@ I read the data from a google sheet where my colleagues and I can edit it. You c
 wc <- read_csv("data/wc.csv")
 wc
 ```
+## Spatial resolution adjustment - data aggregation
+Data on access to hygienic facilities and other water resources in Copenhagen now looks good and tidy, but its *spatial resolution* is higher than the provided polygons (as in we have multiple rows that all fit within one suburb `id`). We therefore use the `group_by()` function to aggregate the data by id before we continue with any spatial operations.  Given that the dataset is in fact a time-series, and each `kvarter` has a record for a given year or decade, we need to group first by the `year` and then only by `id`. 
 
-Data on access to hygienic facilities and other water resources in Copenhagen now looks good and tidy, but its spatial resolution is better than the provided polygons (as in we have multiple rows that all fit within one suburb id). We therefore need to aggregate the data before we attach it to the spatial polygons
+While aggregating the finer scale data into larger units, it is convenient to generate some statistics, such as percentages of flats that have bath and wc and hot water access within each suburb. We do this using the `summarize()` function below.
 ```{r}
 wcdata <- wc %>% 
   group_by(year, suburb_id) %>% 
@@ -81,22 +81,29 @@ wcdata
 #write_rds(wcdata, "data/CPH_wcdata.rds")
 ```
 
-## Join the data with the spatial representations
+## Join the aggregated attribute data with its spatial representations
 Now we can join the data with the spatial polygons
 ```{r merge data}
 wc_spatial <- suburbs %>% 
   merge(wcdata, by.x= "id",by.y ="suburb_id")
 wc_spatial
-
 ```
+Now that we have a merged spatial dataset with attributes, let's review what attributes are available for visualisation
 ```{r check names}
+#Review the column names to see what new columns you have created
 names(wc_spatial)
 ```
-Lets look at the data in a map.
+There is the suburb polygon data, such as id, bydel_nr, navn and areal_m2, and there is also the attribute data such as year, flats, bath ,etc.
+This gives us lots of choices for display. Lets put the data in a map.
 
-# Put the data on the map
+# Plot the data on the map
+
+Let's start by plotting one year alone, to learn how the map works.
 
 ## Flats and water resources in 1950
+Run the whole chunk below, and once it renders, look at the map. Afterwards, try changing the definition of what is to be displayed on line 116. For example, replace `"flats"` for some other column, such as `"pct_bath"`, or `"wc_access"` to see how the map changes. 
+To modify the legend, you can modify line 118 where we describe `style`. Replace `style = "jenks"` with `"pretty"`, or `"equal"`, or `"quantile"`. What happens to your classification?
+
 ```{r plot1950}
 wc1950 <- wc_spatial %>% 
   filter(year==1950)
@@ -104,11 +111,11 @@ wc1950 <- wc_spatial %>%
 library(tmap)
 tmap_mode(mode = "plot")
 tm_shape(wc1950) +
-  #tm_facets(by = "year")+
   tm_borders(col = "black",
              lwd = 1) +
   tm_polygons("flats",
-             style = "pretty")+
+              id = "navn",
+             style = "jenks")+
   tm_legend(legend.position= c("RIGHT", "TOP"))+
   tm_compass(position = c("RIGHT", "BOTTOM"),
              type = "rose", 
@@ -118,78 +125,79 @@ tm_shape(wc1950) +
                text.size = 1) +
   tm_credits(position = c("RIGHT", "BOTTOM"),
              text = "Adela Sobotkova, 2021") +
-  tm_layout(main.title = "Copenhagen Flats",
+  tm_layout(main.title = "Copenhagen 1950 situation",
             legend.outside = FALSE)
 ```
 
 ## Flats through time
-```{r view-flats}
-library(tmap)
-tmap_options(limits = c(facets.view = 6)) # we want to view 6 years
+Now, that you have mastered visualization of a single year, let's plot all the years we have available!
+```{r view-flats, fig.width = 12}
+tmap_options(limits = c(facets.view = 5)) # we want to view 5 periods
 tmap_mode(mode = "view" )
 tm_shape(wc_spatial) +
-  tm_facets(by = "year")+
+  tm_facets(by = "year",
+            ncol=3, nrow = 2)+
   tm_polygons("flats",
-             style = "pretty")+
+              id = "navn",
+             style = "jenks")+
   tm_layout(main.title = "Copenhagen Flats",
             legend.outside = TRUE)
-
 ```
 <br>
 ## Lets look at flats per square kilometer
-
+Now that we have a spatial object, we can create new columns, for example utilizing the shape area to calculate the density of flats per sq km.
 ```{r addsqkm}
 wc_spatial <- wc_spatial %>% 
   mutate(area_km2 = areal_m2/1000000,
          flat_per_km = flats/area_km2)
 ```
 
-```{r viewflats-per-km,eval = FALSE}
+```{r viewflats-per-km, fig.width = 12, fig.height = 12}
 library(tmap)
-tmap_options(limits = c(facets.view = 6))
+tmap_options(limits = c(facets.view = 5)) # we want to view 6 years
 tmap_mode(mode = "view" )
 tm_shape(wc_spatial) +
-  tm_facets(by = "year") +
+  tm_facets(by = "year",
+            ncol=3, nrow = 2)+
   tm_polygons("flat_per_km",
               n=5,
-             style = "quantile") #+
-  # tm_layout(main.title = "Copenhagen Flats per sq km",
-  #           legend.outside = TRUE)
+             style = "jenks") #+
+  
 ```
 
 <br>
 ## Access to toilets and baths, per suburb and sq kilometer
 
 Lets calculate the baths and toilets available per square kilometer per each suburb
-```{r view-pct-bath}
+```{r view-pct-bath, fig.width = 12}
 library(tmap)
-tmap_options(limits = c(facets.view = 6))
+tmap_options(limits = c(facets.view = 5)) # we want to view 5 years
 tmap_mode(mode = "view" )
 tm_shape(wc_spatial) +
-  tm_facets(by = "year")+
-  # tm_borders(col = "black",
-  #            lwd = 1) +
+  tm_facets(by = "year",
+            ncol=3, nrow = 2)+
   tm_polygons("pct_bath",
+              id = "navn",
              style = "pretty", 
-             title = "% of flats with \n access to bath") #+
-  # tm_layout(main.title = "Percentage of flats with access to a bath", legend.outside = TRUE)
-```
-
-```{r view-pct-wc}
-library(tmap)
-tmap_options(limits = c(facets.view = 6))
-tmap_mode(mode = "view" )
-tm_shape(wc_spatial) +
-  tm_facets(by = "year")+
-  # tm_borders(col = "black",
-  #            lwd = 1) +
-  tm_polygons("pct_wc",
-             style = "pretty", 
-             title = "% of flats with <br>access to WC")+
-  tm_layout(main.title = "Percentage of flats with access to WC",
-            legend.outside = TRUE)
+             title = "% of flats with <br> access to bath") #+
+  
 ```
 <br>
+<br>
+```{r view-pct-wc, fig.width = 12}
+library(tmap)
+tmap_options(limits = c(facets.view = 5)) # we want to view 5 periods
+tmap_mode(mode = "view" )
+tm_shape(wc_spatial) +
+  tm_facets(by = "year",
+            ncol=3, nrow = 2)+
+  tm_polygons("pct_wc",
+              id = "navn",
+             style = "pretty", 
+             title = "% of flats with <br>access to WC")
+  
+```
+
 <br>
 ## You can further recalculate the number of baths per sq kilometer
 
@@ -201,14 +209,14 @@ wc_spatial <- wc_spatial %>%
 ```
 
 ### ..or continue with communal resources and warm water
-
+Why not practice and try plotting the flats that have access to communal baths and wc, and or hot water? Create your own map here, following the examples above.
 
 ```{r}
 
 ```
 
-<br>
-<br>
+<p>
+
 
 # Access OSM data for Copenhagen and retrieve (whatever would be relevant?)
 
@@ -281,6 +289,8 @@ Now, let's display the results in two synchronized `mapview` maps:
 
 ```{r mapview-sync}
 library(mapview)
+# library(leafsync)
+# library(leaflet)
 map_osm <-  mapview(baths_osm, map.types = "OpenStreetMap", 
         col.regions = "#940000", 
         label = as.character(suburbs$name), 
@@ -289,8 +299,7 @@ map_osm <-  mapview(baths_osm, map.types = "OpenStreetMap",
 
 
 #test map
-mapview(baths_cph[,-3], map.types = "Stamen.TonerLite", cex="radius", legend=FALSE,
-        col.regions="#217844", lwd=0, alpha=0.4)
+mapview(baths_cph[,-3], map.types = "Stamen.TonerLite", cex="radius", legend=FALSE, col.regions="#217844", lwd=0, alpha=0.4)
 
 map_cph <-  mapview(baths_cph[,-3], 
           map.types = "OpenStreetMap", 
@@ -301,11 +310,15 @@ map_cph <-  mapview(baths_cph[,-3],
         layer.name = "Baths per sq km <br>in suburbs from 1970",
         homebutton = FALSE, lwd = 0.5) 
 
-sync(map_osm,map_cph)
-```
 
-## Improve the display
-The synced map functionality is nice, but the comparison does not make much sense: OSM public bathrooms versus private bathing facilities. It might be better to combine the OSM data with the public bathhouse data that we had looked at previously in Leaflet.
+sync(map_osm,map_cph)
+
+```
+What a fantastic synced map! Two maps with entirely different datasets and moving interactively. The synced map functionality is nice, but the comparison does not make much sense: OSM public bathrooms versus private bathing facilities originating from suburb polygons are not exactly comparable. How can we improve?
+
+
+## Improve the display with some comparable dataset
+It might be better to combine the OSM data with the public bathhouse data that we had looked at previously in Leaflet.
 
 We need to 
 
@@ -323,11 +336,12 @@ names(baths)
 hist_bathhouses <- baths %>% 
   dplyr::select(BathhouseName,Longitude,Latitude,Quality) %>% 
   filter(!is.na(Longitude)) %>% 
-  st_as_sf(coords=c("Longitude", "Latitude"), crs = 4236)
+  st_as_sf(coords=c("Longitude", "Latitude"), crs = 4326)
 
 hist_baths <- st_transform(hist_bathhouses, crs=32632)
 
 #test map
+library(mapview)
 mapview(hist_baths, map.types = "Stamen.TonerLite",
         #cex="radius", legend=FALSE,
         col.regions="#217844", lwd=0, alpha=0.4)
@@ -354,6 +368,7 @@ map_hist <-  mapview(hist_baths,
 sync(map_osm,map_hist)
 ```
 <br>
+Lovely two different patterns, showing current public baths and toilets in Copenhagen and historical ones. The city has grown (how much?) and so clearly have the hygienic facilities. In the next section, you can see how we may formally evaluate the similarity of spatial patterning between the historical and current data.
 <br>
 
 
@@ -365,7 +380,7 @@ Here we might be able to use some statistical functions that contrast nearest ne
 
 We should first check the nature of data:  do both patterns represent  *completely mapped data* rather than *sampled data* (where the nature of sampling can affect the comparison)? If the former, one could use nearest neighbor, K-function or Monte Carlo reassignment.
 
-For a tutorial on Kcross function, see Manny G in https://gis.stackexchange.com/questions/4484/comparing-two-spatial-point-patterns#4490
+For a tutorial on Kcross function, see Manny G's contribution to this exchange https://gis.stackexchange.com/questions/4484/comparing-two-spatial-point-patterns#4490
 
 ## Before we try some cross-functions, we need to wrangle 
 But first we need to recast the baths as `ppp` object.
@@ -385,11 +400,13 @@ combined <- data.frame(rbind(st_coordinates(hist_baths),
 # Now I am ssigning marks which need to be a factor
 combined$name <- factor(c(rep("H",21), rep("O", 166))) 
 
+combined
 # Create an sf object out of the dataframe
 b_c <- st_as_sf(combined, coords = c("X","Y"), crs = 32632)
 
 # Convert into a marked ppp and confirm by plotting
 b_ppp <- as.ppp(b_c)
+b_ppp
 plot(split(b_ppp))
 ```
 ## Nearest Neighbour Cross Function and Simulation
@@ -408,16 +425,6 @@ for(i in 1:999){
 hist(nn.sim,breaks=30)
 abline(v=mean(nncross(split(b_ppp)$O,split(b_ppp)$H)$dist),col="red")
 ```
-### Compute empirical cumulative distribution
-```{r nn-cumul}
-nn.sim.ecdf  <-  ecdf(nn.sim)
-```
-
-### See how the original stat compares to the simulated distribution
-```{r}
-nn.sim.ecdf(mean(nncross(split(b_ppp)$O,split(b_ppp)$H)$dist)) 
-```
-
 
 ## Ripley-K cross function
 
@@ -434,7 +441,8 @@ kcross <- Kcross(b_ppp, i="H",j="O",
                  correction='none') 
 plot(kcross)
 ```
-How to explain this chart? It seems that the OSM baths cluster around historical baths, or are attracted to them even at distances. Or in other words, the 'O' events are closer to 'H' events that we would expect under complete spatial randomness. 
+How to explain this chart? It seems that the OSM baths cluster around historical baths, or are attracted to them even at distances. Or in other words, the 'O' events are closer to 'H' events than we would expect under complete spatial randomness. 
+Look at this chart for explanation https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-statistics/multi-distance-spatial-cluster-analysis.htm 
 
 How do we test for statistical significance? The question here is whether the H and O events are similarly clustered or not? Statistical difference can be tested with MC simulation with random labelling of points as O or H type (keeping original ratios) and computing the same cross K-function. The simulation mean and the established simulation envelopes tell us whether the observed *between-type* pattern is statistically significant or not.
 ```{r simulate-kross-env}
