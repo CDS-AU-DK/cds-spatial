@@ -336,3 +336,57 @@ Phenomenal political testing. Social Democrats show even less correlation. P-val
 
 
 Well-done! Not so much correlation as it might seem at the first sight.
+
+# Task 6: Different sorts of neighborhood
+
+## Connect the nearest places (islands)
+
+```{r dnear}
+# Reload the data if needed
+mun
+
+# Consider simplifying (don't go too high)
+mun_sm<- st_cast(st_simplify(mun, dTolerance = 250),
+                     to = "MULTIPOLYGON")
+plot(mun_sm$geometry)
+
+# Use the spdep package
+library(spdep)
+
+# Get center points of each municipality
+mun_centers <-st_centroid(mun_sm$geometry, of_largest_polygon = TRUE)
+
+# Make neighbor list from neighbours at 100km distance
+nb_100 <- dnearneigh(mun_centers, 0, 100000)
+plot(mun_sm$geometry); plot(nb_100, mun_centers, col = "red",add = TRUE)
+
+# Make neighbor list from neighbours at 50km distance
+nb_50 <- dnearneigh(mun_centers, 0, 50000)
+plot(mun_sm$geometry); plot(nb_50, mun_centers, col = "blue",add = TRUE)
+title(main="Neighbours within 50 km distance")
+```
+
+## Rerun Moran's I
+Now let's rerun Moran's I with different neighbour conceptions
+```{r}
+DKDF <- elections %>% 
+  filter(grepl("^O",Party))
+
+# Run a Moran I test on Dansk Folkeparti votes in 2015 based on neighbors within 50km
+moran.test(DKDF$pct_vote2015,             nb2listw(nb_50, style = "W",zero.policy=TRUE),
+           zero.policy=TRUE)
+
+# Run a Moran I test on Dansk Folkeparti votes in 2015 based on 3 neighbors
+moran.test(DKDF$pct_vote2015, 
+           nb2listw(knn2nb(k3), style = "W",zero.policy=TRUE),
+           zero.policy=TRUE)
+
+# Run a Moran I test on Dansk Folkeparti votes in 2011 baed on 3 neigbors
+moran.test(DKDF$pct_vote2011, 
+           nb2listw(knn2nb(k3), style = "W",zero.policy=TRUE),
+           zero.policy=TRUE)
+
+# Do a Monte Carlo simulation to get a better p-value
+moran.mc(DKDF$pct_vote2015,nb2listw(knn2nb(k3), zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
+
+```
