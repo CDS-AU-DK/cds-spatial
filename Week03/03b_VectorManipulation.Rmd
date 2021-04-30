@@ -1,0 +1,554 @@
+---
+title: "W03b - Bounding boxes, Buffers and centroids"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Buffer layers
+
+Computing buffers is a key spatial analysis skill and the resulting buffers have a wide range of uses like, for example, identifying the number of roads within one kilometer of a school or computing the number of hazardous waste sites near sensitive natural areas.
+
+Although, technically you can buffer data with unprojected coodinate reference systems, the buffer distance will be more meaningful with a projected CRS so it is highly recommended that you transform unprojected data to a projected CRS before buffering.
+
+## Instructions
+
+* Load the packages `sf` and `raster`along with the objects `df` and `kaz` in your workspace.
+* Use `st_as_sf()` to convert this data frame to an `sf` object, use 4326 for the `crs` argument because these points are latitude/longitude -- an unprojected CRS.
+* Use `st_transform()` to transform the points' CRS to match the kaz image so we can plot them together. You will need the `crs()` function to get the CRS of the kaz image.
+* Buffer your points by 1000 meters (no need to specify "meters", since this is the projection unit, this will be the default). The radius argument is `dist`.
+* Plot the kaz image, and the geometries of buffers and points together. This will require running `plotRGB()`, `plot()`, and `plot()` again, all together.
+
+```{r buffer, eval=FALSE}
+# Review df
+df <- data.frame(place = c("Golyama Kosmatka", 
+                           "Regional History Museum - Iskra"),                 longitude=c(25.3312772,25.3871474),
+        latitude=c(42.6999763,42.6248429))
+
+
+# Convert the data frame to an sf object             
+df_sf <- ___(df, coords = c("longitude", "latitude"), ___)
+
+# Transform the points to match the kaz CRS
+df_crs <- ___(df_sf, crs = ___(kaz, ___ = TRUE))
+
+# Buffer the points
+df_buf <- ___(df_crs, dist = ___)
+
+# Plot the kaz image (it is multi-band)
+___(kaz)
+___(___(df_buf), col = "firebrick", add = TRUE)
+___(___(df_crs), pch = 16, add = TRUE)
+```
+
+### Solution
+
+```{r buffer-sol, echo=FALSE}
+# Instructor: Create df and load kaz
+library(sf)
+library(raster)
+library(dplyr)
+kaz <- brick("data/Kaz.tif")
+
+df <- data.frame(place = c("Golyama Kosmatka", "Regional History Museum - Iskra"),                 longitude=c(25.3312772,25.3871474),
+latitude=c(42.6999763,42.6248429))
+
+# Review df
+df
+
+# Convert the data frame to an sf object             
+df_sf <- st_as_sf(df, coords = c("longitude", "latitude"), crs =4326)
+
+# Transform the points to match the kaz CRS
+df_crs <- st_transform(df_sf, crs = crs(kaz, asText = TRUE))
+
+# Buffer the points
+df_buf <- st_buffer(df_crs, dist = 1000)
+
+# Plot the kaz image (it is multi-band)
+plotRGB(kaz,stretch = "lin")
+plot(st_geometry(df_buf), col = "firebrick", add = TRUE)
+plot(st_geometry(df_crs), pch = 16, add = TRUE)
+
+```
+
+Congratulations! Buffering is pretty straightforward in `sf`. The hardest part is probably getting your data into R and ensuring that they have the right coordinate reference system.
+
+# Task 2: Compute polygon centroids
+Similar to buffering, computing polygon centroids is a bedrock geoprocessing task used to assign values and even to help with labeling maps. The function for this in sf is `st_centroid()`.
+
+Also similar to buffering, centroid calculations should generally be performed on data with a projected coordinate reference system.
+
+## Instructions
+
+* Read in the `municipalities` shapefile ("municipalities.shp").
+* Project/transform the municipalities shapefile and use CRS number 32635 as the target CRS, this is the code for the CRS of the `kaz` image.
+* Compute the centroids with `st_centroid()` and store as an object named `centroids`. Only one argument is required.
+* Plot the geometry of `municipalities_tf` object with the centroids on top. This requires two calls to `plot()` run together. The second will need `add = TRUE`.
+
+```{r centroids, eval=FALSE}
+# Read in the municipality shapefile
+municipalities <- ___
+
+# Project municipalities to match kaz
+municipalities_tf <- ___(municipalities, crs = 32618)
+
+# Compute the municipality centroids
+centroids <- ___(municipalities_tf)
+
+# Plot the municipality geometry
+plot(___(municipalities_tf), col = "grey", border = "white")
+plot(centroids, pch = 16, col = "firebrick", ___ = ___)
+```
+
+### Solution
+```{r centroids-sol, echo=FALSE}
+# Read in the municipalities shapefile
+municipalities <- st_read("data/municipalities.shp")
+
+# Project municipalities to match kaz
+municipalities_tf <- st_transform(municipalities, crs = 32618)
+
+# Compute the municipality centroids
+centroids <- st_centroid(municipalities_tf)
+
+# Plot the municipality geometry
+plot(st_geometry(municipalities_tf), col = "grey", border = "white")
+plot(centroids, pch = 16, col = "firebrick", add = TRUE)
+```
+
+Complete! You will find that knowing how to compute polygon centroids will serve you well in many contexts
+
+# Task 3: Create a bounding box around vector data
+You can compute bounding boxes around vector data using `sf`. These can help you, for example, create polygons to clip layers to a common area for an analysis (e.g to compare mound heights in different areas) or identify regions of influence.
+
+In the `sf` package, there is a function for extracting the bounding box coordinates, if that's all you need, this is `st_bbox()`. More likely you'll want to create a new `sf` object (a polygon) from those coordinates and to do this `sf` provides the `st_make_grid()` function.
+
+`st_make_grid()` can be used to make a multi-row and multi-column grid covering your input data but it can also be used to make a grid of just one cell (a bounding box). To do this, you need to specify the number of grid cells as `n = 1`.
+
+## Instructions
+
+* Create `gs` object by reading in the shapefile "gornosahrane.shp", which denotes an anomalous high-density group of small mounds in NW Kazanlak.
+* Plot the `gs` object on top of the `municipalities` object -- wrap `municipalities` in `st_geometry()` so you're not plotting any attributes. This requires two calls to `plot()` and one will need `add = TRUE`.
+* Compute the bounding box coordinates with `st_bbox()`.
+* Create a single polygon bounding box around the Gorno Sahrane area with `st_make_grid()` with an argument of `n = 1`.
+* Create a plot of the `municipalities` (just the geometry), the `gs` and the new box around the Gorno Sahrane area.
+
+```{r NY-box, eval= FALSE}
+# Read in the Gorno Sahrane shapefile
+gs <- ___(___)
+
+# Plot the municipalities and Gorno Sahrane mounds
+plot(___(municipalities), col = "grey", border = "white")
+plot(gs, ___ = ___, pch = 16, col = "forestgreen")
+
+# Compute the coordinates of the bounding box
+___(gs)
+
+# Create a bounding box polygon
+gs_box <- ___(gs, n = ___)
+
+# Plot the municipalities, add the Gorno Sahrane mounds and add the new box
+plot(___(municipalities), col = "grey", border = "white")
+plot(gs, add = ___, pch = 16, col = "forestgreen")
+plot(gs_box, add = ___)
+```
+
+### Solution
+
+```{r gs-create, include=FALSE}
+# Instructor to create Gorno Sahrane mounds
+# plot(mounds$geometry)
+# e <- drawExtent(show = TRUE,col = "red")
+# gs <- st_crop(mounds,e)
+# plot(st_geometry(gs))
+# st_write(gs, "../scripts_bg/data/gornosahrane.shp")
+```
+
+
+```{r NY-box-sol, echo = FALSE}
+# Read in the Gorno Sahrane mounds shapefile
+gs <- st_read("data/gornosahrane.shp")
+
+# Plot the municipalities and Gorno Sahrane mounds
+plot(st_geometry(municipalities), col = "grey", border = "white")
+plot(gs, add = TRUE, pch = 16, col = "forestgreen")
+
+# Compute the coordinates of the bounding box
+st_bbox(gs)
+
+# Create a bounding box polygon
+gs_box <- st_make_grid(gs, n = 1)
+
+# Plot the municipalities, add the Gorno Sahrane mounds and add the new box
+plot(st_geometry(municipalities), col = "grey", border = "white")
+#plot(mounds$geometry)
+plot(gs, add = TRUE, pch = 16, col = "forestgreen")
+plot(gs_box, add = TRUE)
+```
+
+Bounding box completed! You can see in the plot that the bounding box is the minimum rectangular polygon that fits all the Gorno Sahrane mounds. You might now clip a series of layers to this box for a consistent extent. You will learn how to do this in a later exercise.
+
+
+# Task 4: Dissolve multiple features into one
+In order to compute a tighter bounding box, a convex hull, around a set of points like the Gorno Sahrane mounds or even the Kazanlak mounds, which do not neatly fit a rectangular shape you'll need to learn one more function first.
+
+For points, remember and beware that the convex hull function creates a boundary around **each** point! This is unlikely what you want. More likely you want to compute a convex hull around all your points. If you have a set of points and you want to draw a convex hull around them you first need to bundle the points into a single MULTIPOINT feature and in order to do this you will use the dissolve function in `sf` called `st_union()`.
+
+With polygons, `st_union()` will dissolve all the polygons into a single polygon representing the area where all the polygons overlap. Your set of individual points will be dissolved/unioned into a single, MULTIPOINT feature that you can use for tasks like computing the convex hull.
+
+## Instructions
+
+* Buffer the `gs` object by 3000 with `st_buffer()` -- `sf` will automatically use meters, the units of the CRS. But remember to project `gs` to `kaz` object so as to have units be metric. Use pipes for neater code.
+* Create a new object called `gs_buffers` which is just the geometry of the buffered Gorno Sahrane mounds with `st_geometry()`.
+* Compute the number of features in the `gs_buffers` object with `length()` and `plot()` to see what they look like.
+* Dissolve the buffers in `gs_buffers`, call this `gs_buf_union`.
+* Compute the number of features in the `gs_buf_union` object with `length()` and `plot()` to see what the dissolved object looks like.
+
+```{r buffers, eval=FALSE}
+# Buffer the Gorno Sahrane mounds by 3000 after projecting the object to kaz crs
+gs_buffer <- gs %>% 
+  st_transform(crs = ___(___, asText=TRUE)) %>% 
+  st_buffer(___)
+
+# Limit the object to just geometry
+gs_buffers <- ___(gs_buffer)
+
+# Compute the number of features in gs_buffer
+___(gs_buffers)
+
+# Plot the gs mound buffers
+___(gs_buffers)
+
+# Dissolve the buffers
+gs_buf_union <- ___(gs_buffers)
+
+# Compute the number of features in gs_buf_union
+___(gs_buf_union)
+
+# Plot the dissolved buffers
+___(gs_buf_union)
+
+```
+
+### Solution
+```{r buffers-sol, echo=FALSE}
+# Buffer the Gorno Sahrane mounds by 3000; they must be projected to kaz
+gs_buffer <- gs %>% 
+  st_transform(crs = crs(kaz, asText=TRUE)) %>% 
+  st_buffer(3000)
+
+# Limit the object to just geometry
+gs_buffers <- st_geometry(gs_buffer)
+
+# Compute the number of features in gs_buffer
+length(gs_buffers)
+
+# Plot the gs mound buffers
+plot(gs_buffers)
+
+# Dissolve the buffers
+gs_buf_union <- st_union(gs_buffers)
+
+# Compute the number of features in gs_buf_union
+length(gs_buf_union)
+
+# Plot the dissolved buffers
+plot(gs_buf_union)
+```
+
+Great! You'll see later that the `st_union()` function is important in other spatial analysis contexts, so it's a good one to commit to memory.
+
+# Task 5: Compute a convex hull around vectors
+A more precise bounding polygon is sometimes needed, one that fits your data more neatly. For this, you can use the `st_convex_hull()` function. Note that `st_convex_hull()` will compute a tight box around each one of your features *individually* so if you want to create a convex hull around a group of features you'll need to use `st_union()` to combine individual features into a single multi-feature.
+
+## Instructions
+
+* Use `head()` on `gs` to look at the data frame and see the type of geometry.
+* Use `st_union()` to combine the individual points in the `gs` object into a single MULTIPOINT geometry and call this gs1.
+* Use `head()` on `gs1` to see the type of geometry of the dissolved object.
+* Use the `length()` function from `base` R on `gs` and `gs1` to confirm that the number of features went from 17 to 1.
+* Use the `st_convex_hull()` function on `gs1` to compute the tight bounding box around the Gorno Sahrane mounds and call this `gs_hull`.
+* Plot `gs_hull` and then plot the points on top. Use `plot()` twice and run the lines together.
+
+```{r convexhull, eval=FALSE}
+# Look at the data frame to see the type of geometry
+___(gs)
+
+# Convert the points to a single multi-point
+gs1 <- ___(gs)
+
+# Look at the data frame to see the type of geometry
+___(gs1)
+
+# Confirm that we went from 17 features to 1 feature
+___(gs)
+___(gs1)
+
+# Compute the tight bounding box
+gs_hull <- ___(gs1)
+
+# Plot the points together with the hull
+plot(gs_hull, col = "red")
+plot(gs1, ___ = ___)
+```
+
+### Solution
+```{r convexhull-sol, include=FALSE}
+# Look at the data frame to see the type of geometry
+head(gs)
+
+# Convert the points to a single multi-point
+gs1 <- st_union(gs)
+
+# Look at the data frame to see the type of geometry
+head(gs1)
+
+# Confirm that we went from 17 features to 1 feature
+length(gs)
+length(gs1)
+
+# Compute the tight bounding box
+gs_hull <- st_convex_hull(gs1)
+```
+
+
+```{r convexhull-sol-plot, echo=FALSE}
+# Plot the points together with the hull
+plot(gs_hull, col = "red")
+plot(gs1, add =TRUE)
+
+```
+
+It takes a little getting used to, but when computing a convex hull, you'll need to remember to first *dissolve/union/combine* your individual features into a multi-feature. When you used `head()` you should have noticed that you started with “POINT” objects and after `st_union()` you had “MULTIPOINT”.
+
+
+# Task 6: Spatial joins
+For many analysis types you need to link geographies spatially. For example, you want to know how many mounds are in each municipality but you don't have a municipality attribute in the mound data. The best way to do this is with a spatial join using `st_join()`.
+
+Importantly, the `st_join()` function requires `sf` data frames as input and will not accept an object that is just `sf` geometry. You can use the `st_sf()` function to convert `sf` geometry objects to an sf data frame (`st_sf()` is essentially the opposite of `st_geometry()`).
+
+## Instructions
+
+* Plot the mounds (`mounds`) on top of the municipalities (`municipalities`). You will want to plot only the geometry of the municipalities.
+* Use `class()` to see if the `mounds` object has class `data.frame` or if it's just geometry.
+* Use `st_join()` to conduct a spatial join in order to add municipality information to the `mounds` object.
+* Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`Name_EN`).
+* What three municipalities contain the most mounds?
+
+```{r mounds-munic, eval=FALSE}
+# Plot the mounds on top of the municipalities
+___(___(municipalities))
+plot(mounds, ___ = ___, pch = 16, col = "red")
+
+# Determine whether mounds has class data.frame
+___(mounds)
+
+# Join the mounds mounds with the municipalities
+mounds_neigh <- ___(mounds, municipalities)
+
+# Confirm that mounds_neigh has the municipality information
+___(mounds_neigh)
+
+# Calculate the count of mounds per municipality
+```
+
+### Solution
+```{r mounds-munic-sol, echo=FALSE}
+# Plot the mounds on top of the municipalities
+plot(st_geometry(municipalities))
+plot(mounds, add = TRUE, pch = 16, col = "red")
+
+# Determine whether mounds has class data.frame
+class(mounds)
+
+# Join the mounds mounds with the municipalities
+mounds_neigh <- st_join(mounds, municipalities)
+
+# Confirm that mounds_neigh has the municipality information
+head(mounds_neigh)
+
+# Calculate the count of mounds per municipality
+mounds_neigh %>% 
+  group_by(Name_EN) %>% 
+  tally() %>% 
+  arrange(desc(n))
+
+mun <- unique(mounds_neigh$Name_EN)
+
+```
+
+Great! The mounds object did not have municipality information until you performed the spatial join with `st_join()`. Now that the municipality information is included you can supply each municipality office with the count and coordinates of mounds they are in charge of so they can monitor and safeguard.
+
+# Task 7: Spatial relationships
+In exercise 1 above you have created a buffer object of 2000m around the biggest mound in the valley and around the Kazanlak History Museum. In this exercise you will calculate 
+
+*a) how many mounds are within 2000 m radius of Golyama Kosmatka and 
+*b) how many survey units are completely within this area as well.  
+
+TO achieve this, you will need to select the first object in the buffer (Golyama Kosmatka one) and then use `st_intersects()` to tally the mounds within 2000m of the Golyama Kosmatka  and `st_contains()` to determine how many survey units are *completely* within the buffer. You will then use the `st_intersection()` function (notice the slight difference in function name!) to **clip** the mounds and survey units to the buffer.
+
+A note about the output of functions that test relationships between two sets of features. The output of these and related functions is a special kind of list (with the class `sgbp`). For example, when using `st_intersects()`, the first element in the output can be accessed using `[[1]]`, which shows features from the mounds object that intersect with the buffer polygon. Likewise, `[[2]]` would show the buffer polygons that intersect with the mounds.
+
+## Instructions
+
+* Load `mounds`, `df_buf`, and `survey` objects and verify consistent projection
+* Use `st_intersects()` to identify `mounds` that intersect with the buffer object (`df_buf`) and call the result `mounds_int`.
+* Use `st_contains()` to identify `survey` features that are completely within the buffer object (`buf`) and call the result `survey_cont`.
+* Extract `mounds` and survey units that intersect and are contained by  `df_buf` and save as `int` and `cont`.
+* Use the `int` object you just created to identify the IDs of the mounds that intersect with buffer (the first will be XXXX).
+* Use `st_intersection()` to "clip" the mounds by `df_buf` and call this `mounds_clip`. Do the same with survey units. 
+* Plot the result
+
+```{r intersect, eval=FALSE}
+# Check consistent projection
+________==______________
+
+
+# Identify mounds that intersect with the buffer
+mounds_int <- ___(df_buf, mounds)
+
+# Identify survey units contained by the buffer
+survey_cont <- ___(df_buf, survey)
+
+# Get the indexes of which mounds intersect and which units 
+# are contained by the buffer
+int <- mounds_int[[___]]
+cont <- survey_cont[[___]]
+
+# Get the IDs or codes of the mounds and survey units in buffer
+mounds$TRAPCode[___]
+
+# Clip the mounds and survey layers by the buffer (ignore the warning)
+mounds_clip <- ___
+survey_clip <- ___
+
+# Plot the geometry of the clipped mounds
+plot(df_buf$geometry[1,], border = "blue")
+plot(survey[cont,], add = TRUE, col = "yellow")
+plot(st_geometry(mounds_clip), col = "red", add = TRUE, pch = 19)
+
+```
+
+### Solution
+```{r intersect-sol, echo = FALSE}
+# Check alignment and reproject mounds if needed
+st_crs(mounds)== st_crs(survey)
+st_crs(df_buf)==st_crs(survey)
+
+# Identify mounds that intersect with the buffer
+mounds_int <- st_intersects(df_buf, mounds)
+
+# Identify mounds contained by the buffer
+survey_cont <- st_contains(df_buf, survey)
+
+# Get the indeces of mounds and survey units which respectively intersect and are contained by the buffer
+int <- mounds_int[[1]]
+cont <- survey_cont[[1]]
+
+# Get the IDs of mounds and survey units in the buffer
+mounds$TRAP_Code[int]
+survey$SUID[cont]
+
+# Clip the mound and survey layer constrained by the buffer
+mounds_clip <- st_intersection(df_buf[1], mounds)
+survey_clip <- survey %>% 
+  slice(cont)
+
+# Plot the geometry of the clipped mounds
+plot(df_buf$geometry[1,], border = "blue")
+plot(st_geometry(survey[cont,]), add = TRUE, col = "aquamarine", border = "grey")
+plot(mounds_clip$geometry, add = TRUE, col = "red", pch = 4)
+```
+
+#### Questions: 
+
+1. What is the class of the object produced via `st_intersects()`?
+2. Why do we need to use `survey[cont,]` to view the fully contained survey units in the buffer plot?
+3. How many survey units are there within the buffer?
+
+The `sf` package has a lot of different functions for determining relationships. Some are easy to conflate!  You have just used `st_intersects()` and `st_contains()` here but there are others as well and what you use will depend on what relationships you're looking at. In this exercise you also used the important `st_intersection()` function to clip one layer based on another.
+
+# Task 8: Measuring distance between features
+Of course, measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
+
+In this exercise you'll measure the distance from the regional capital of Kazanlak to all the mounds in the valley and identify the closest one.
+
+## Instructions
+
+* Create `cities` object from "kaz_cities.shp" shapefile. 
+* Select the regional capital of Kazanlak using `LNAME` field (it stands for 'latin alphabet' name)
+* Test whether the CRS of `cities` matches the CRS of the preloaded object `mounds` with `st_crs()`.
+* Use `st_distance()` to compute the distance between Kazanlak and each mound in the valley.
+* Use `head()` to take a quick look at the result.
+* Identify the index of the smallest distance using `which.min()` and assign it to nearest.
+* Use `nearest` to pull out the row from `mounds` of the nearest mound (see the `TRAP_Code` variable, it should be 4105).
+
+```{r nearest, eval=FALSE}
+# Read in the cities object
+cities <- ___(___)
+
+# Test whether the CRS match
+___(mounds) == ___(cities)
+
+# Select Kazanlak
+Kazanlak <- 
+  
+# Compute the distance between Kazanlak and mounds
+d <- ___(___, Kazanlak)
+
+# Take a quick look at the result
+___(d)
+
+# Find the index of the nearest mound
+nearest <- ___(d)
+
+# Identify the mound that is nearest to the city
+mounds[___, ]$TRAP_Code
+```
+
+### Solution
+```{r nearest-sol, include=FALSE}
+# Read in the cities object
+cities <- st_read("data/kaz_cities.shp")
+
+# Test whether the CRS match
+st_crs(mounds) == st_crs(cities)
+
+# Select Kazanlak
+Kazanlak <- cities %>% 
+  filter(LNAME == "Kazanlak")
+
+# Compute the distance between the city of Kazanlak and the mounds
+d <- st_distance(mounds, Kazanlak)
+
+# Take a quick look at the result
+head(d)
+
+# Find the index of the nearest mound
+nearest <- which.min(d)
+
+# Identify the mound that is nearest
+mounds[nearest,]$TRAP_Code
+
+```
+
+Nice work! If you look at the result for the last line of code carefully you'll see that the closest mound is 4105. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)

@@ -1,0 +1,38 @@
+<PAMDataset>
+  <Metadata />
+  <Metadata domain="Esri">
+    <MDI key="PyramidResamplingType">NEAREST</MDI>
+  </Metadata>
+  <PAMRasterBand band="1">
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">1368.0999755859</MDI>
+      <MDI key="STATISTICS_MEAN">241.02024673963</MDI>
+      <MDI key="STATISTICS_MINIMUM">9.6000003814697</MDI>
+      <MDI key="STATISTICS_STDDEV">74.927501391706</MDI>
+    </Metadata>
+  </PAMRasterBand>
+  <PAMRasterBand band="2">
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">1118.5300292969</MDI>
+      <MDI key="STATISTICS_MEAN">297.67167479636</MDI>
+      <MDI key="STATISTICS_MINIMUM">7.6199998855591</MDI>
+      <MDI key="STATISTICS_STDDEV">38.829116988322</MDI>
+    </Metadata>
+  </PAMRasterBand>
+  <PAMRasterBand band="3">
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">1371.9899902344</MDI>
+      <MDI key="STATISTICS_MEAN">304.26092081886</MDI>
+      <MDI key="STATISTICS_MINIMUM">10.409999847412</MDI>
+      <MDI key="STATISTICS_STDDEV">61.856151288469</MDI>
+    </Metadata>
+  </PAMRasterBand>
+  <PAMRasterBand band="4">
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">1231.1099853516</MDI>
+      <MDI key="STATISTICS_MEAN">425.2782261926</MDI>
+      <MDI key="STATISTICS_MINIMUM">19.239999771118</MDI>
+      <MDI key="STATISTICS_STDDEV">125.44529680308</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>

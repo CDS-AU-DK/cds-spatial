@@ -1,0 +1,251 @@
+---
+title: "W03 - Coordinate Systems"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Vector and raster coordinate systems
+In order to perform any spatial analysis with more than one layer, your layers should share the same coordinate reference system (CRS) and the first step is determining what coordinate reference system your data has. To do this you can make use of the `sf` function `st_crs()` and the `raster` function `crs()`.
+
+When the geographic data you read in with `sf` already has a CRS defined both `sf` and `raster` will recognize and retain it. When the CRS is not defined you will need to define it yourself using either the EPSG number or the proj4string.
+
+In this exercise, you will streamline the CRS of the mound, municipality and elevation datasets you worked with before, and you will also use the `getData()` function to download additional data.  
+
+## Instructions
+
+* Ensure the packages `tidyverse`, `sf` and `raster` are loaded in your workspace.
+* Read in mounds from a spreadsheet and convert to an `sf` object with `st_as_sf()` function, feeding `Lat` and `Long` columns as variables in the `coords` argument. Beware that Longitude goes always first!
+* Load `municipalities` shapefile and `elevation` and `elsrtm` rasters.
+* Use `st_crs()` to identify if a CRS exists and what it is for the `mounds` and `municipalities` objects.
+* Use the `st_crs()` function to define/assign a Web Mercator CRS (4326) to the `mounds` object.
+* Use `crs()` to identify if a CRS exists and what it is for the `elevation` and `elsrtm` objects.
+* Use the `crs()` function to define/assign a CRS to the `elevation` object. The Aster is project in UTM35N, only the definition got lost in translation. Assign it via the proj string.
+
+```{r crs, eval=FALSE}
+# Read in the municipality shapefile
+municipalities <- st_read("data/municipalities.shp")
+
+# Read in the mounds table
+mounds <- read_csv("data/KAZ_mounddata.csv")
+
+# Convert the mounds data into an sf object
+mounds <- st_as_sf(mounds, coords = c("Long", "Lat"))
+
+# Determine the CRS for the municipalities and mounds vector objects
+___(municipalities)
+___(mounds)
+
+# Assign the 3D geographic CRS to mounds because the coordinates are angular degrees
+crs_1 <- "+proj=longlat +ellps=WGS84 +no_defs"
+___(mounds) <- ___
+
+# Read in the elevation single-band raster from AsterRcl or from SRTM service
+elevation <- raster("data/AsterRcl.tif")
+elsrtm <- getData("SRTM", path = "data", lon = 25, lat = 42)
+
+# What CRS are the elevation and elsrtm rasters
+___(elevation)
+___(elsrtm)
+
+# Assign the CRS UTM35N to Aster elevation
+crs_2 <- "+proj=utm +zone=35 +datum=WGS84 +units=m +no_defs"
+___(elevation) <- ___
+```
+
+### Solution
+```{r libraries-and-data,echo=FALSE}
+# Libraries and data
+library(sf)
+library(raster)
+
+# Read in the municipality shapefile
+municipalities <- st_read("data/municipalities.shp")
+
+
+# Read in the mounds table
+mounds <- read_csv("data/KAZ_mounddata.csv")
+
+# Convert the mounds data into an sf object
+mounds <- st_as_sf(mounds, coords = c("Long", "Lat"))
+
+# Determine the CRS for the municipalities and mounds vector objects
+st_crs(mounds)
+
+# Assign the CRS to mounds
+crs_1 <- "+proj=longlat +ellps=WGS84 +no_defs"
+st_crs(mounds) <- crs_1
+
+# Read in the elevation single-band raster
+elevation <- raster("data/AsterRcl.tif")
+elsrtm <- getData("SRTM", path = "data", lon = 25, lat = 42)
+
+# Determine the CRS for the elevation and elsrtm rasters
+crs(elevation)
+crs(elsrtm)
+
+# Assign the CRS UTM35N to Aster elevation
+crs_2 <- "+proj=utm +zone=35 +datum=WGS84 +units=m +no_defs"
+crs(elevation) <- crs_2
+```
+
+Nice! You can determine what the CRS is using `st_crs()` for vectors or `crs()` for rasters. If one doesn't exist, you can also use those functions to define the CRS.
+
+<br>
+
+# Task 2: Transform your layers to a common CRS
+In the previous exercise, when you ran `st_crs()` and `crs()` you may have noticed that the CRS' were different for the different layers. The vector layer's CRS began with `+proj=longlat` and the raster layer's began with `+proj=utm` or `+proj=aea`. In order to use these layers together in spatial analysis we will want them to have the same CRS.
+
+In this exercise you will transform (sometimes this is called "project") the objects so they share a single CRS. The desired CRS is 2D projected system described by EPSG 32635, which fits the zone of Bulgaria. 
+Why should you project? It is generally best to perform spatial analysis with layers that have a projected CRS (and some functions require this). To determine if your object has a projected CRS you can look at the first part of the result from `st_crs()` or `crs()` -- **if it begins with `+proj=longlat` then your CRS is unprojected.**
+
+Note that you are using `method = bilinear` by default given that the elevation raster values are continuous. Remember to use `method = "ngb"` in your call to `projectRaster()` if you have a categorical raster in order to prevent distortion (e.g. if you were converting the kaz image).  
+
+# Instructions
+
+* Load `sf` and `raster` in your workspace.
+* Use the `crs()` function with argument `asText = TRUE` on the elevation layer to get the CRS as a string and save this as `the_crs`.
+* Use `st_transform()` to transform the vector `mounds` object to the CRS in `the_crs`.
+* Use `st_transform()` to transform the vector `municipalities` object to the CRS in `the_crs`.
+* Use `projectRaster()` to transform the raster `elsrtm` object to the CRS in `the_crs`. This will take a few seconds.
+* Use `st_crs()` on `mounds` and `municipalities`, and `crs()` on `elevation` to confirm that they now have the same CRS. They should all have a CRS that starts with `+proj=aea`.* 
+
+```{r crs-assign, eval=FALSE}
+# Get the CRS from the elevation object
+the_crs <- ___(elevation, asText = TRUE)
+
+# Project mounds to match the CRS of elevation
+mounds_crs <- ___(mounds, crs = ___)
+
+# Project municipalities to match the CRS of elevation
+municipalities_crs <- ___(municipalities, ___ = ___)
+
+# Project elsrtm to match the CRS of elevation
+elsrtm_crs <- ___(elsrtm, crs = ___, method = "bilinear")
+
+# Look at the CRS to see if they match
+___(mounds_crs)
+___(municipalities_crs)
+___(elsrtm_crs)
+
+```
+
+### Solution
+```{r crs-assign-sol, echo=FALSE}
+# Get the CRS from the elevation object
+the_crs <-crs(elevation, asText = TRUE)
+
+# Project mounds to match the CRS of elevation
+mounds_crs <- st_transform(mounds, crs = the_crs)
+
+# Project municipalities to match the CRS of elevation
+municipalities_crs <- st_transform(municipalities, crs = the_crs)
+
+# Project elevation to match the CRS of elevation
+elsrtm_crs <- projectRaster(elsrtm, crs = the_crs, method = "ngb")
+
+# Look at the CRS to see if they match
+st_crs(mounds_crs)
+st_crs(municipalities_crs)
+crs(elsrtm_crs)
+```
+
+Great work! This may be the least fun part of spatial analysis but knowing how to do it will save you from a lot of frustration later.
+
+
+# Task 3: Plot vector and raster together
+If the layers do not share a common CRS they may not align on a plot. To illustrate, in this exercise, you will initially create a plot with the `plot()` function and try to add two layers that do not share the same CRS. You will then transform one layer's CRS to match the other and you will plot this with both the `plot()` function and functions from the `tmap` package.
+
+Note that for this exercise we returned all the layers to their original CRS and did not retain the changes you made in the last exercise.
+
+With the `plot()` function you can plot multiple layers on the same map by calling `plot()` multiple times. You'll need to add the argument `add = TRUE` to all calls to `plot()` after the first one and you need to run the code for all layers at once rather than line-by-line.
+
+Make sure `sf`, `raster` and `tmap` are loaded in your workspace.
+
+## Instructions
+
+* Try to plot the original `mounds` sf object on the `elevation` object with `plot(elevation)` followed by `plot(mounds, add = TRUE)`. Do you see the mounds?
+* Use `st_crs()` on the `mounds` layer and `crs()` on the `elevation` layer to see if they share a CRS.
+* Save the CRS of the `elevation` layer as a new object called `the_crs`. You should use `crs()` with the `asText = TRUE argument`.
+* Use `st_transform()` to transform the `mounds` CRS to match the `elevation` layer.
+* Re-run the `plot()` code from the instruction above. Do you see the mounds now?
+* Run the given `tmap` code. Install the `tmap` package if you do not have it yet. It offers an excellent mapping library.
+
+```{r plot, eval=FALSE}
+# Plot elevation and mounds (run both lines together)
+# Do you see the mounds?
+___(elevation)
+___(mounds, add = TRUE)
+
+# See if elevation and mounds share a CRS
+___(mounds)
+___(elevation)
+
+# Save the CRS of the elevation layer
+the_crs <- ___(elevation, asText = ___)
+
+# Transform the mounds CRS to match elevation
+mounds_crs <- ___(mounds, crs = ___)
+
+# Re-run plotting code (run both lines together)
+# Do the mounds show up now?
+___(elevation)
+___(mounds_crs, add = TRUE)
+
+# Simply run the tmap code (install the tmap package if needed)
+library(tmap)
+tm_shape(elevation) + 
+    tm_raster() + 
+    tm_shape(mounds_crs) + 
+    tm_dots(alpha = 0.5)
+```
+
+### Solution
+```{r plot-sol, echo=FALSE}
+# Plot elevation and mounds (run both lines together)
+# Do you see the mounds?
+plot(elevation);plot(mounds$geometry, add = TRUE)
+
+# See if elevation and mounds share a CRS
+st_crs(mounds)
+crs(elevation)
+
+# Save the CRS of the elevation layer
+the_crs <- crs(elevation, asText = TRUE)
+
+# Transform the mounds CRS to match elevation
+mounds_crs <- st_transform(mounds, crs = the_crs)
+
+# Re-run plotting code (run both lines together)
+# Do the mounds show up now?
+plot(elevation);plot(mounds_crs, add = TRUE)
+
+# Simply run the tmap code
+library(tmap)
+tm_shape(elevation) + 
+    tm_raster() + 
+    tm_shape(mounds_crs) + 
+    tm_dots(alpha = 0.5)
+```
+
+Great work! As you noticed, you mostly can't plot layers together if they don't have the same CRS. You'll see later that there are exceptions but it is definitely best practice to ensure the layers you'll work with have a common, projected CRS.
+
+
