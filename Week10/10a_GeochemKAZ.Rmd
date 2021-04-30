@@ -29,23 +29,37 @@ Your job is to explore the fertility of soils in Kazanlak and apply the knowledg
 
 ```{r ca-data, eval=FALSE}
 # Load data
+kaz_geo <- read_csv("data/KAZ_geo.csv")
+kaz_geo <- st_as_sf(kaz_geo, coords = c("Long", "Lat"), crs = 4326)
+kaz_geo <- st_transform(kaz_geo, crs = 32635)
+
+kaz_sites <- st_read("data/KAZ_scatterpoints.shp")
+st_crs(kaz_sites)
 
 # See what OM_muns measurements are at each location
+plot(kaz_geo$geometry)
 
 # Get a summary of the organic matter (OM) values
+summary(kaz_geo$OM_muns)
 
 # Look at the distribution
+hist(kaz_geo$OM_muns)
 
 # Plot a map of organic matter
+ggplot(kaz_geo) +
+  geom_sf(aes(col = OM_muns)) 
+#+
+ # geom_sf(data=kaz_sites, aes())
 
 # Plot both the sampled and unsampled locations
+plot(kaz_geo$geometry); plot(kaz_sites$geometry, col = "red", add =TRUE)
 ```
 
 It's a little tricky to see spatial trends from the ggplot. Let's see how we can make the patterns clearer.
 
 
 ## Task 2: Fitting a trend surface
-The  data shows OM broadly increasing from south-west to north-east. Fitting a linear model with the coordinates as covariates will interpolate a flat plane through the values.
+The  data shows OM broadly increasing from south-east to north-west. Fitting a linear model with the coordinates as covariates will interpolate a flat plane through the values.
 
 ### Instructions
 
@@ -56,11 +70,15 @@ The  data shows OM broadly increasing from south-west to north-east. Fitting a l
 
 ```{r fit-model, eval=FALSE}
 # Are there coordinates and what are they called?
+names(kaz_geo)
+kaz_geo$X <- st_coordinates(kaz_geo)[,1]
+kaz_geo$Y <- st_coordinates(kaz_geo)[,2]
 
 # Complete the formula
+m_trend <- lm(OM_muns ~ X + Y , kaz_geo)
 
 # Check the coefficients
-
+summary(m_trend)
 ```
 There seems to be a significant trend! Linear regressions are a good first model for exploring many datasets.
 
@@ -81,13 +99,20 @@ Your next task is to compute the soil nutrient content at the ancient village lo
 
 ```{r predict, eval=FALSE}
 # Create a data frame of missing data
-
+kaz_geo_miss <- kaz_sites %>% 
+  mutate(X = st_coordinates(.)[,1], 
+         Y = st_coordinates(.)[,2], 
+         OM = "NA", 
+         ID = as.numeric(TRAP_Code)) %>% 
+  dplyr::select(ID, X, Y, OM)
 
 # Predict OM for the missing data
-predictions <- predict(___, newdata = ___, se.fit = TRUE)
+predictions <- predict(m_trend, newdata = kaz_geo_miss, se.fit = TRUE)
+kaz_geo_miss$OM <- predictions$fit
 
 # Compute the exceedance probability
-pFertile <- 1 - pnorm(___, mean = predictions$fit, sd = predictions$se.fit)
+pFertile <- 1 - pnorm(5, mean = predictions$fit, sd = predictions$se.fit)
+hist(pFertile)
 ```
 
 
@@ -96,7 +121,9 @@ Filling in the gaps and calculating exceeding values is an important task in man
 Plot the result!
 
 ```{r}
-
+ggplot(kaz_geo_miss) + 
+  geom_sf(aes(color = OM)) +
+  geom_sf(data=kaz_geo, aes(color = OM_muns))
 ```
 
 Beautiful! Now you know what the soil nutrient values at your ancient site centroids estimated through a linear trend following a gaussian distribution. But what if you want to take into account spatial weighting?  or, wanted to have not only a point but an entire field of values in the radius of ancient village centroids?
@@ -118,16 +145,15 @@ The y-range of the binned variogram is always much smaller than the variogram cl
 
 ```{r binned-vgm, eval = FALSE}
 # Load gstat and sp library
-library(_____)
-library(_____)
-
-# Reload kaz_geo and miss 
+library(gstat)
+library(sp)
+library(raster)
 
 # Make a cloud from the non-missing data up to 10km
-plot(variogram(OM_muns ~ 1, ____, cloud = TRUE, cutoff = ___))
+plot(variogram(OM_muns ~ 1, kaz_geo, cloud = TRUE, cutoff = 10000))
 
 # Make a variogram of the non-missing data
-plot(variogram(OM_muns ~ 1, ______))
+plot(variogram(OM_muns ~ 1, kaz_geo))
 ```
 
 
@@ -146,7 +172,7 @@ The shape of the previous variogram tells you there is a large-scale trend in th
 # Remember what projected coordinates are called?
 
 # The OM_muns depends on the coordinates
-OM_vgm <- variogram(____ ~ ____ + ____, kaz_geo)
+OM_vgm <- variogram(OM_muns ~ X + Y, kaz_geo)
 plot(OM_vgm)
 ```
 
@@ -175,14 +201,14 @@ The sill is the the upper limit of the model. That is, the long-range largest va
 plot(OM_vgm)
 
 # Eyeball the variogram and estimate the initial parameters
-nugget <- ___
-psill <- ___
-range <- ___
+nugget <- 2.4
+psill <- 2.6
+range <- 4000
 
 # Fit the variogram
-v_model <- ___(
+v_model <- fit.variogram(
   OM_vgm, 
-  model = ___(
+  model = vgm(
     model = "Ste",
     nugget = nugget,
     psill = psill,

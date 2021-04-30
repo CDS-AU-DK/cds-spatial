@@ -1,0 +1,245 @@
+---
+title: "Least Cost Path Analysis"
+author: "Adela Sobotkova"
+date: "12-April-2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# Why?
+Humans are animals whose activities are constrained by a spatial range. Some of us like to live close to work, some to shopping, others to hotspots of social activity or green areas. While people differ in specific priorities, they all tend to optimize the cost of movement.
+In this exercise I wish to explore how many citizens of ancient Rome lived within a half-day walk of a city with basic civic amenities (market place, temple, theatre, etc.). A major city is a town of 5000 inhabitants or one with the said monuments. 
+
+# Setup
+Download the package `gdistance` and load the necessary srtm files for Italy (between 8- 12 lng and 40-42 lat)
+
+## Lets download some data
+```{r download-Italy}
+# gdistance
+#install.packages("gdistance")
+library(raster)
+library(gdistance)
+
+#Download two more tiles
+srtm1 <- getData('SRTM', lon=10, lat=42, path = ".") #39.04.zip
+#plot(srtm1)
+hist(srtm1)
+# srtm2 <- getData('SRTM', lon=8, lat=42)
+# plot(srtm2)
+# srtm3 <- getData('SRTM', lon=16, lat=40)
+# plot(srtm3)
+# srtm4 <- getData('SRTM', lon=12, lat=40)
+# plot(srtm4)
+# srtm5 <- getData('SRTM', lon=15, lat=42)
+# plot(srtm5)
+# srtm6 <- getData('SRTM', lon=8, lat=40)
+# plot(srtm6)
+```
+
+Attach the files together in order to have a continuous raster covering the whole of the Apennine peninsula. You can use the `mosaic()` function.
+
+```{r mosaic-project}
+#Join up srtm tiles into a mosaic centered on Italy and then project
+# srtmmosaic <- mosaic(srtm1, srtm2, srtm3, srtm5, fun=mean)
+# plot(srtmmosaic)
+# it_32632 <- projectRaster(srtmmosaic, crs = CRS("+init=epsg:32632"))
+# 
+# hist(it_32632)
+# plot(it_32632)
+
+# Smaller
+srtm1_prj <- projectRaster(srtm1, crs = CRS("+init=epsg:32633"))
+# Bigger is not necessarily better, but just in case:
+
+hist(srtm1_prj)
+rcl <- cbind(-100,0, NA)
+srtm_prj <- reclassify(srtm1_prj, rcl = rcl)
+hist(srtm_prj)
+
+# mosaicItaly <- mosaic(srtmmosaic, srtm4, fun=mean)
+# plot(mosaicItaly)
+# mosaic_32632 <- projectRaster(mosaicItaly, crs = CRS("+init=epsg:32632"))
+# plot(mosaic_32632)
+```
+ 
+## The Hiking Function requires the slope as input.
+slope = difference in height / distance travelled
+
+```{r slope-correct}
+library(gdistance)
+r <- srtm_prj
+heightDiff <- function(x){x[2] - x[1]}
+hd <- transition(r,heightDiff,8,symm=FALSE)
+hd
+slope <- geoCorrection(hd, scl=FALSE)
+slope
+#plot(raster(slope))
+```
+
+Subsequently, we calculate the speed. We need to exercise special care, because the matrix values between non-adjacent cells are 0, but the slope between these cells is not 0! Therefore, we need to restrict the calculation to adjacent cells. We do this by creating an index for adjacent cells (adj) with the function `adjacent()`. Using this index, we extract and replace adjacent cells, without touching the other values
+
+```{r adjacent-speed}
+adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8)
+speed <- slope
+speed[adj] <- 6 * 1000*  exp(-3.5 * abs(slope[adj] + 0.05)) # converting to meters given that all rasters are in m units
+plot(raster(speed), main = "Friction of surface in meters per hour, uncalibrated") # km per hour
+```
+
+Now we have calculated the speed of movement between adjacent cells. We are close to having the final conductance values. Attainable speed is a measure of the ease of crossing from one cell to another on the grid. 
+However, we also need to take into account the distance between cell centres. Travelling with the same speed, a diagonal connection between cells takes longer to cross
+than a straight connection. Therefore, we use the function `geoCorrection()` again!
+
+```{r geocorrection}
+conductance <- geoCorrection(speed, scl = FALSE)
+plot(raster(conductance), main = "Conductivity of surface in 1/traveltime calibrated") # the difference is hard to see, but ok, I'll take the word for it
+```
+
+
+# All roads lead to Rome - what does it cost them?
+Cost surface for Cities in Italy
+Lets create a raster of isochrones of temporal distance from Rome
+Coordinates of Rome in decimal degrees
+Latitude: 41.8919300°
+Longitude: 12.5113300°
+or 
+Easting: 293538.75664729
+Northing: 4640772.4548957
+
+```{r}
+#Rome <- c(12.5113300, 41.8919300)
+Rome_prj <- c(293538.75664729,4640772.4548957)
+
+y <- accCost(conductance, fromCoords = Rome_prj)
+plot(y, main = "cost of travel in hours"); contour(y, add =TRUE) # is this in seconds??
+10000/3600
+
+
+```
+
+
+## Add more cities
+
+```{r libraries, include=FALSE}
+devtools::install_github("sdam-au/sdam")
+
+library(tidyverse)
+library(sdam)
+library(jsonlite)
+library(getPass)
+```
+
+# Load data with Sciencedata.dk login credentials
+
+1. Input your sciencedata.dk username - type directly into the RStudio console
+616760@au.dk
+
+```{r, login1, echo = FALSE }
+user <- readline("your sciencedata username: ")
+```
+
+2. Make the request (you will be asked for password in a new pop-up window)
+
+```{r, login2-request, echo = FALSE }
+resp = request("roman_cities.json", path="/sharingin/648597@au.dk/SDAM_root/SDAM_data/urban", method="GET", cred=c(user, getPass("your sciencedata password: ")))
+resp2 = request("roman_provinces.json", path="/sharingin/648597@au.dk/SDAM_root/SDAM_data/urban", method="GET", cred=c(user, getPass("your sciencedata password: ")))
+```
+Now you can move to the next step and Make a tibble from the request's resp.
+
+
+# Make a tibble from the request and display the first six records (head)
+
+```{r json-wrangle}
+list_json <- jsonlite::fromJSON(resp)
+cities_tibble = as_tibble(list_json)
+
+interim_json <- jsonlite::toJSON(cities_tibble, auto_unbox = TRUE)
+list_json <- jsonlite::fromJSON(interim_json)
+cities_tibble = as_tibble(list_json)
+head(cities_tibble)
+```
+
+do the same for provinces
+
+```{r province-json-wrangle}
+provlist_json <- jsonlite::fromJSON(resp2)
+province_tibble = as_tibble(provlist_json)
+
+interim_json <- jsonlite::toJSON(province_tibble, auto_unbox = TRUE)
+list_json <- jsonlite::fromJSON(interim_json)
+provinces = as_tibble(list_json)
+head(provinces)
+```
+
+Make cities into an sf object and crop by the boundaryof Italy
+
+```{r cities-sf}
+library(sf)
+library(raster)
+library(tidyverse)
+
+names(cities_tibble)
+head(cities_tibble$`Longitude (X)`)
+hist(cities_tibble$pop_est)
+
+library(mapview)
+library(sf)
+# Big cities
+cities_tibble %>% 
+  filter(pop_est >10000) %>% 
+  st_as_sf(coords = c("Longitude (X)", "Latitude (Y)"), 
+           crs = 4326) %>% 
+  mapview()
+
+# Small cities
+cities_tibble %>% 
+  filter(pop_est < 10000) %>% 
+  st_as_sf(coords = c("Longitude (X)", "Latitude (Y)"), 
+           crs = 4326) %>% 
+  mapview()
+
+# Cities shapefile
+cities_sp <- cities_tibble %>% 
+  st_as_sf(coords = c("Longitude (X)", "Latitude (Y)"), 
+           crs = 4326) 
+
+# Get modern boundary of Italy and use it to crop the cities
+IT <- getData("GADM", country = "IT", level = 1)
+plot(IT) # 4326
+I_utm <- st_as_sf(IT) %>% 
+  st_transform(crs = 32633) 
+
+c_i <- st_intersection(cities_sp, st_as_sf(IT)) %>% 
+  st_transform(crs = 32633)
+c_ii <- st_crop(c_i, srtm_prj)  
+plot(srtm1_prj);plot(c_ii$geometry, add = TRUE); plot(I_utm$geometry, add =TRUE)
+#e <- drawExtent(show = TRUE, col = "red")
+```
+```{r big-cities}
+c5k <- c_ii %>% 
+  filter(pop_est > 5000) 
+
+test <- c_ii %>% 
+  dplyr::filter(Ancient.Toponym == "Amiternum" | Ancient.Toponym == "Vulci")
+library(gdistance)
+yy <- accCost(conductance, fromCoords = as(test, "Spatial"))
+plot(yy)
+plot(yy, main = "cost of travel in hours");  contour(yy, add =TRUE); plot(I_utm$geometry, add =TRUE)
+
+```
+

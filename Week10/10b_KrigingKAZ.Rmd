@@ -35,19 +35,21 @@ library(_____)
 library(_____)
 
 # Reload kaz_geo, missing value dataframe and the v_model
-
+kaz_geo
 
 # Set the trend formula and the new data
-km <- krige(OM ~ ___ + ___, kaz_geo, newdata = kaz_geo_miss, model = v_model)
+km <- krige(OM ~ X + Y, kaz_geo, newdata = kaz_geo_miss, model = v_model)
 names(km)
 
 # Plot the predicted values
-
+ggplot(km) +
+  geom_sf(aes(col = var1.pred))
 
 # Compute the probability of highly fertile soil samples, and map
 km$pFertile <- 1 - pnorm(7, mean = km$var1.pred, sd = sqrt(km$var1.var))
-spplot(__________)
-ggplot(_________)
+
+spplot(as(km, "Spatial"), "pFertile")
+
 ```
 
 Well done on filling in the missing values using the previously generated variogram! Next you'll see how to go from point predictions to gridded predictions.
@@ -94,27 +96,29 @@ Finally, `SpatialPixels()` converts the raster cropped `gridpoints` to the equiv
   
 ```{r create-grid, eval=FALSE}
 # Create geo_bounds bounding box for kaz_geo 
-geo_bounds <- __________
+library(sf)
+geo_bounds <- st_make_grid(kaz_geo$geometry, n=1)
 
 # Plot the bounding box polygon and points
-
+plot(kaz_geo$geometry); plot(geo_bounds, add= TRUE) 
 
 # Find the left bottom corner of the bounding box
-
+st_bbox(kaz_geo)
 
 # Define a 0.5km square grid over the polygon extent. The first parameter is the bottom left corner.
-grid <- ___(___, c(500, 500), c(35, 40))
+grid <- GridTopology(c(352042.5,4712740.7), c(500, 500), c(35, 40))
 
 # Create points with the same coordinate system as the boundary box
-gridpoints <- ___(___, proj4string = CRS(projection(___)))
-plot(gridpoints)
+crs(kaz_geo)
+gridpoints <- SpatialPoints(grid, proj4string = CRS(projection("+proj=utm +zone=35 +datum=WGS84 +units=m +no_defs")))
+plot(gridpoints); plot(geo_bounds, col = "red", add = TRUE)
 
 # Crop out the points outside the boundary
-cropped_gridpoints <- ___(gridpoints, ___)
-plot(cropped_gridpoints)
+cropped_gridpoints <- crop(gridpoints, as(geo_bounds, "Spatial"))
+plot(cropped_gridpoints);  plot(geo_bounds, col = "red", add = TRUE)
 
 # Convert to SpatialPixels
-spgrid <- ___(cropped_gridpoints)
+spgrid <- SpatialPixels(cropped_gridpoints)
 coordnames(spgrid) <- c("X", "Y")
 plot(spgrid)
 
@@ -145,22 +149,27 @@ Use the spatial pixel grid of the region, `spgrid`, and the variogram model of O
 
 ```{r kriging over grid task, eval=FALSE}
 # Adjust the kaz_geo CRS to be consistent with spgrid
-crs(kaz_geo)
-crs(spgrid)
+crs(as(kaz_geo, "Spatial"), asText = TRUE) == crs(spgrid, asText = TRUE)
+
+# Despite the statement above krige() is erroring out due to CRS misalignment, so forcing it here:
+kaz_geo_sp <- as(kaz_geo, "Spatial")
+crs(kaz_geo_sp) <- crs(spgrid)
 
 # Do kriging predictions over the grid
-OM_grid <- ___(OM ~ x + y, kaz_geo, newdata = ___, model = ___)
+library(gstat)
+OM_grid <- krige(OM_muns ~ X + Y, kaz_geo_sp, newdata = spgrid, model = v_model)
 
 # Plot the soil-nutrient predictions in a grid
-image(__)
-contour(_____)
+image(OM_grid, col = rainbow(100))
+contour(OM_grid, levels= seq(1, 10, 1), add = TRUE, col = "black")
 
+print(OM_grid)
 
 # Calculate the probability of organic matter exceeding 7
-OM_grid$pFertile <- 1 - pnorm(7, mean = OM_grid$___, sd = ___(OM_grid$___))
+OM_grid$pFertile <- 1 - pnorm(7, mean = OM_grid$var1.pred, sd = sqrt(OM_grid$var1.var))
 
 # Map the probability of soils OM exceeding 7
-spplot(OM_grid, zcol = "___")
+spplot(OM_grid, zcol = "pFertile")
 
 # Plot soil-nutrient content estimates with a color ramp
 ```
@@ -188,18 +197,22 @@ We will apply it here to get predictions at the ancient village locations so we 
 
 ```{r autokriging, eval=FALSE}
 # Ensure all the necessary objects exist
+library(automap)
 
+# If you are getting an error about spatial reference not being the same (like Adela was in class), coerce it for the new_data and input_data objects
+kaz_geomiss <- as(kaz_geo_miss, "Spatial")
+crs(kaz_geomiss) <- crs(kaz_geo)
 
 # Kriging with linear trend, predicting over the missing points
 OM_auto <- autoKrige(
-  ___ ~ ___ + ___, 
-  input_data = ___, 
-  new_data = ___, 
-  model = "___"
+  OM_muns ~ X + Y, 
+  input_data = as(kaz_geo, "Spatial"), 
+  new_data = kaz_geomiss, 
+  model = "Mat"
 )
 
 # Plot the variogram, predictions, and standard error
-___
+plot(OM_auto)
 ```
 
 Beautiful charts. Notice alignment between the Kriging predictions and the plot created in Task 1: The cluster in the southeast is predicted to be infertile, while there are clusters in the northwest, northeast and center that are estimated to be highly fertile. Pretty neat!
@@ -227,7 +240,12 @@ The geochem survey data, `kaz_geo`, the missing value dataframe, `kaz_geo_miss`,
 # Load the library
 
 # Auto-run the kriging
-OM_auto_grid <- ___(___, input_data = ___, new_data = ___)
+OM_auto_grid <- autoKrige(
+  OM_muns ~ X + Y, 
+  input_data = kaz_geo_sp, 
+  new_data = spgrid, 
+  model = "Mat"
+)
 
 # Remember predictions from manual kriging
 plot(OM_grid)
@@ -237,7 +255,7 @@ plot(OM_auto_grid)
 
 # Compare the variogram model to the earlier one
 v_model
-OM_auto_grid$___
+OM_auto_grid$var_model
 ```
 
 
