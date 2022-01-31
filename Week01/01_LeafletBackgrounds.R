@@ -58,8 +58,7 @@ leaflet() %>%
 # Bring in a choice of esri background layers  
 
 l_aus <- leaflet() %>%   # assign the base location to an object
-  setView(150.314, -33.74, zoom = 13)
-
+  setView(151.2339084, -33.85089, zoom = 13)
 
 esri <- grep("^Esri", providers, value = TRUE)
 
@@ -85,24 +84,31 @@ AUSmap <- l_aus %>%
                         function (e) {
                         myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
                         })
-                        }")
+                        }") %>% 
 addControl("", position = "topright")
 
+AUSmap
 ################################## SAVE FINAL PRODUCT
 
 # Save map as a html document (optional, replacement of pushing the export button)
 # only works in root
 
 saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
-
-
+#########################################################
+#
+# Task 1: Create a Danish equivalent with esri layers, call it DKmap
+#
+# Task 2: Start collecting spatial data into a spreadsheet: https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479
+#
+#
 ################################## ADD DATA TO LEAFLET
 # Libraries
 library(tidyverse)
 library(googlesheets4)
 library(leaflet)
 
-places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=0",col_types = "cccnncn")
+places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479",
+                     range = "SA2022", col_types = "cccnncnc")
 glimpse(places)
 
 leaflet() %>% 
@@ -113,17 +119,8 @@ leaflet() %>%
 
 #########################################################
 #
-# Task 1: Create a Danish equivalent with esri layers
-# Task 2: Read in the googlesheet data you and your colleagues populated with data. 
-# The googlesheet is at https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=0
+# Task 3: Read in the googlesheet data you and your colleagues populated with data. 
+# The googlesheet is at https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479
 
 #########################################################
-# HW solution for RC data
-rc <- read_csv("data/RCFeature.csv")
-glimpse(rc)
-rc <- rc %>% filter(!is.na(Longitude))
 
-AUSmap %>%  # adjust view to Katoomba 150.314, -33.74
-  addMarkers(lng = rc$Longitude, 
-             lat = rc$Latitude,
-             popup = rc$FeatureID)
