@@ -19,17 +19,8 @@ getwd()
 
 ### ELENOVO burial mounds: prepare data 
 # Read data from where you downloaded it. Adela,look in: D:/Adela/Professional/Projects/MQNS/Data/"
-mounds <- read.csv("data/ElenovoMounds_cleaned.csv", stringsAsFactors = FALSE)
+mounds <- read_csv("data/ElenovoMounds_cleaned.csv")
 
-# Check that coordinate fields are numbers
-cols.num<- c("Longitude","Latitude", "Northing", "Easting")
-mounds[cols.num]<-sapply(mounds[cols.num], as.numeric) # some NA's where there are no temperatures available
-
-# Eliminate any detected NAs
-which(is.na(cols.num))
-
-mounds[25,] #row 25 in original dataset has multivalued coordinate, which is coerced into NA
-mounds <- mounds[-25,]
 
 # Transform dataframe into a spatial feature and project to Web Mercator 
 # Leaflet basemapes here are 3D
@@ -63,11 +54,12 @@ moundmap <- leaflet() %>%
     overlayGroups = c("Mounds"),
     options = layersControlOptions(collapsed = T))
 
+moundmap
 
 # Mounds with Icon
-MoundIcon <- makeIcon("data/Mound.png", 20, 20)
+MoundIcon <- makeIcon(iconUrl = "data/Mound.png", iconWidth = 20, iconHeight = 20)
 
-leaflet() %>%
+iconmap <- leaflet() %>%
   addTiles() %>%
   addProviderTiles("Esri.WorldTopoMap", group = "Topo") %>%
   addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
@@ -83,8 +75,11 @@ leaflet() %>%
     overlayGroups = c("Mounds"),
     options = layersControlOptions(collapsed = T))
 
+iconmap
+
 # Print a html
 # use saveWidget() from library htmlwidgets to save a (standalone) interactive map in the current directory.
 
 library(htmlwidgets)
 saveWidget(moundmap, "moundmap.html", selfcontained = TRUE)
+saveWidget(iconmap, "iconmap.html", selfcontained = TRUE)

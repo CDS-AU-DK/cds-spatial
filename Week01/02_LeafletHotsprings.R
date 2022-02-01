@@ -43,33 +43,18 @@ head(springs)
 # Make sure our longitude is negative, so that these plot in the right hemisphere. :)
 
 
+# The chunk below:
 
+# While you can make a leaflet map just with Latitude and Longitude, 
+# you can also convert the table to simple feature and load the object into 'data' 
+# argument to map it.
 
 # Make the UTM cols spatial (X/Easting/lon, Y/Northing/lat)
 springs.SP <- st_as_sf(springs, coords = c("LONG", "LAT"), crs = 4326)
 st_crs(springs.SP)
 
 
-# to project the file to UTM 10N
-st_crs(32610)
-springs.SP <- st_transform(springs.SP, crs=32610) # but tiles in Leaflet use Web Mercator 4326
-
-# To get projected coordinates (Northing&Easting) and feed them back into the csv
-springs.SP$utm_E <- st_coordinates(springs.SP)[,1]
-springs.SP$utm_N <- st_coordinates(springs.SP)[,2]
-st_coordinates(springs.SP)
-
-# Coerce back to data.frame:
-#springs.SP<-st_set_geometry(springs.SP, NULL)
-
-plot(springs.SP$geometry)
-
-
-## PLOTTING in Leaflet
-
-# Reproject into Web Mercator for display in Leaflet
-springs.SP <- st_transform(springs.SP, crs=4326) # Base imagery is 3D
-
+# Leaflet
 
 library(leaflet)
 
