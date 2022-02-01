@@ -65,13 +65,14 @@ moundmap <- leaflet() %>%
 
 
 # Mounds with Icon
-MoundIcon <- makeIcon(iconUrl = "data/Mound.png", 20, 20)
+MoundIcon <- makeIcon("data/Mound.png", 20, 20)
 
 leaflet() %>%
   addTiles() %>%
   addProviderTiles("Esri.WorldTopoMap", group = "Topo") %>%
   addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
-  addMarkers(data=mounds, group="Mounds", icon = MoundIcon,  
+  addMarkers(data=mounds, group="Mounds",
+             icon = MoundIcon,  
              popup = paste0("MoundID: ", mounds$identifier,
                             "<br> Height: ", mounds$HeightMax,
                             "<br> Condition: ", mounds$Condition,

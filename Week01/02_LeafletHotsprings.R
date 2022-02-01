@@ -24,7 +24,7 @@ springs <- htmltab(url, which=1, header = 1,
 
 # Convert Lat/Long columns to numeric:
 
-sapply(springs, class)  # dataframe is  of character class now
+sapply(springs, class)  # dataframe is of a character class now
 cols.num<- c("LAT","LONG", "Temp_F", "Temp_C")  # select columns which need to be numeric
 springs[cols.num]<-sapply(springs[cols.num], as.numeric)  
 # beware that some NA's will appear where there are no temperatures available

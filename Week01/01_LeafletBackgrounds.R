@@ -119,7 +119,7 @@ leaflet() %>%
 
 #########################################################
 #
-# Task 3: Read in the googlesheet data you and your colleagues populated with data. 
+# Task 3: Read in the googlesheet data you and your colleagues populated with data and display it over your DKmap . 
 # The googlesheet is at https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479
 
 #########################################################
