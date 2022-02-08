@@ -37,13 +37,16 @@ opts_knit$set(width=75)
 #### Required R libraries
 
 We will use the sf, raster, and tmap packages.
-Additionally, we will use the spData and spDataLarge packages that provide new datasets.
+Additionally, we will use the spData and spDataLarge packages that provide new datasets. To install the spDataLarge please load it directly from the author's github repository at https://github.com/Nowosad/spDataLarge. If the line in the chunk below does not work, check the repository for the other options.
 
 ```{r}
 library(sf)
 library(raster)
 library(tmap)
 library(spData)
+
+# To install the spDataLarge uncomment the next line
+#install.packages("spDataLarge", repos = "https://geocompr.r-universe.dev")
 library(spDataLarge)
 ```
 
