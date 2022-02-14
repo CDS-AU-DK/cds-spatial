@@ -1,5 +1,5 @@
 ---
-title: "W03b - Bounding boxes, Buffers and centroids"
+title: "Week 03 - Bounding boxes, Buffers, Centroids and Spatial Joins"
 author: "Adela Sobotkova"
 date: "06/01/2021 updated`r Sys.Date()`"
 output:
