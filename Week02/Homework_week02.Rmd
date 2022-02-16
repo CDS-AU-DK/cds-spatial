@@ -165,7 +165,7 @@ Now that you know that coordinate systems differ, make them compatible!
 
 * Reproject the `zion` dataset into the coordinate reference system used in the `srtm` object.
   - Create a new object `zion2`
-  - Visualize the results (`zion2` together with `srtm2`) using the `plot()` function.
+  - Visualize the results (`zion2` together with `srtm`) using the `plot()` function.
 
 ## Your solution
 

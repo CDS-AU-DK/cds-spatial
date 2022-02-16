@@ -49,8 +49,8 @@ df <- data.frame(place = c("Aarhus Domkirke",
 # Convert the data frame to an sf object             
 df_sf <- ___(df, coords = c("longitude", "latitude"), ___)
 
-# Plot the kaz image (it is multi-band)
-___(kaz)
+# Plot the aarhus image (it is multi-band)
+___(aarhus)
 ___(___(df_buf), col = "firebrick", add = TRUE)
 ___(___(df_crs), pch = 16, add = TRUE)
 
@@ -372,47 +372,3 @@ plot(st_geometry(viking_clip), col = "red", add = TRUE, pch = 19)
 3. How many parks and viking monuments respectively are there within the buffer?
 
 The `sf` package has a lot of different functions for determining relationships. Some are easy to conflate!  You have just used `st_intersects()` and `st_contains()` here but there are others as well and what you use will depend on what relationships you're looking at. In this exercise you also used the important `st_intersection()` function to clip one layer based on another.
-
-# Task 8: Measuring distance between features
-Of course, measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
-
-In this exercise you'll measure the distance from the Nobelparken to the viking monuments within the 10km buffer and identify the 10 closest ones.
-
-## Instructions
-
-* Filter Nobelparken out of `db_sf` POINT feature and project to a planar CRS. 
-* Test whether the CRS of `cities` matches the CRS of the preloaded object `viking_clip` with `st_crs()`.
-* Use `st_distance()` to compute the distance between Nobelparken to the viking monuments within the 10km buffer .
-* Use `head()` to take a quick look at the result.
-* Identify the index of the 10 sites with the smallest distance. This may take several steps that include `sort()` and `which()` functions.
-* Use `nearest10` to pull out the rows from `viking` of the nearest viking monument (see the `anlaegsbet` variable).
-
-```{r nearest, eval=FALSE}
-# Create the nobel object and transform to planar CRS
-nobel <- ___(___)
-
-# Test whether the CRS match
-___(viking_clip) == ___(nobel)
-
-
-# Compute the distance between Nobel and viking_clip
-d <- ___(___, Kazanlak)
-
-
-# Compute the distance between the Nobelparken and the clipped viking monuments
-d <- ________(___________, nobel)
-
-# Take a quick look at the result
-________(d)
-
-# Find the index of the 10 nearest viking monuments
-
-
-# Identify the viking monuments that are the nearest, what kinds of monuments are they?
-viking_clip[_________,]$anlaegsbet
-
-# Plot the results by reruning the plot from exercise 6
-```
-
-
-Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)

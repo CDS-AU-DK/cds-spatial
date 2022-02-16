@@ -1,0 +1,172 @@
+---
+title: "Week 04 - Distances"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Get spatial data
+
+Computing buffers is a key spatial analysis skill and the resulting buffers have a wide range of uses like, for example, identifying the number of roads within one kilometer of a school or computing the number of hazardous waste sites near sensitive natural areas.
+
+Although, technically you can buffer data with unprojected coordinate reference systems, the buffer distance will be more meaningful with a projected CRS so it is highly recommended that you transform unprojected data to a projected CRS before buffering.
+
+## Instructions
+
+* Load the packages `sf` and `raster`
+* Load data for Danish municipalities with `getData()` function.
+* Create the object `df` in your workspace.
+* Use `st_as_sf()` to convert this data frame to an `sf` object, use 4326 for the `crs` argument because these points are latitude/longitude -- an unprojected CRS.
+* Use `st_transform()` to transform the points' CRS to match the `municipalities`  so we can plot them together. You will need the `st_crs()` function to get the CRS of the `municipalities` or use the EPSG 25832.
+
+```{r buffer, eval=FALSE}
+# Create dataframe with lat long data
+df <- data.frame(place = c("Aarhus Domkirke", 
+                           "Christianskirken",
+                           "Nobelparken"),
+                 longitude=c(10.2102364,10.1949197,10.2033485),
+                 latitude=c(56.1574919,56.1772228,56.174346))
+
+
+# Convert the data frame to an sf object             
+df_sf <- ___(df, coords = c("longitude", "latitude"), ___)
+
+# Transform the points to match the municipalities' CRS EPSG 25832
+df_crs <- st_transform(df_sf, crs = 25832)
+
+# Load municipalities
+
+```
+
+
+Well done.
+
+# Task 2: Viking monuments in Aarhus municipality
+In this task, you will find out which municipality in Denmark has the most Viking-era monuments and finds registered. You will work with spatial data from [Fund og Fortidsminder](https://www.kulturarv.dk/fundogfortidsminder/Download/), namely a shapefile in ETRS89/UTM32N projection that collects information on 300,000 registered monuments.
+
+For many analysis types you need to link geographies spatially. For example, you want to know how many Viking-era cultural monuments/artefacts (fortidsminder) are in each municipality but you don't have a municipality attribute in the data. The best way to do this is with a spatial join using `st_join()`.
+
+Importantly, the `st_join()` function requires `sf` data frames as input and will not accept an object that is just `sf` geometry. You can use the `st_sf()` function to convert `sf` geometry objects to an sf data frame (`st_sf()` is essentially the opposite of `st_geometry()`).
+
+## Instructions
+
+* Download the fortidsminder archive from [Sciencedata](https://sciencedata.dk/shared/ce0f8e62af16dab66b45f13be90d00f8) and unzip. 
+* Load the anlaeg_all_25832.shp into a `monuments` sf object. It might take couple seconds, because there are 300k of them.
+* Filter the monuments object to those from the Viking-era ("Vikingtid")
+* Plot the monuments (`viking`) on top of the municipalities. You will want to plot only the geometry of the municipalities.
+* Use `class()` to see if the `viking` object has class `data.frame` or if it's just geometry.
+* Use `st_join()` to conduct a spatial join in order to add municipality information to the `viking` object.
+* Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`NAME_2`).
+* What five municipalities contain the most monuments? Which have the least and why? 
+* Challenge: can you plot those five municipalities that contain the fewest viking finds on a map of Denmark? You can use the `st_intersect()` function and select municipalities which satisfy the intersection with fewest finds. 
+
+```{r monuments-munic, eval=FALSE}
+# Load the monuments into R
+monuments <- read_sf(" _________")
+
+# Check the periodisation and type of the monuments
+_____(monuments$datering)
+_____(monuments$anlaegsbet)
+
+# Filter Viking-era finds
+viking <- monuments %>% 
+  _____(___________)
+
+# Plot the monuments on top of the municipalities
+plot(_________(municipalities_tf))
+plot(_________, add = TRUE, pch = 16, col = "red")
+
+
+# Determine whether viking monuments has class data.frame
+class(viking)
+
+# Join the viking monuments with the municipalities
+viking_neigh <- ________(viking, municipalities_tf)
+
+# Confirm that viking_neigh has the municipality information
+head(viking_neigh)
+
+# Calculate the count of monuments per municipality
+viking_neigh %>% 
+  group_by(________) %>% 
+  tally() %>% 
+  arrange(____(__)) 
+
+# Create an object with 5 of the least populated municipalities
+least <- viking_neigh %>% 
+  group_by(________) %>% 
+  tally() %>% 
+  arrange(__) %>%
+  _____(1:5)
+  
+  
+# Plot the municipalities with fewest Viking finds in red over DK municipalities
+plot(__________, col = "grey", border = "white")
+plot(municipalities_tf[_________(___________(least, municipalities_tf, sparse = FALSE)), ]$geometry, col = "red", add = T) 
+
+```
+
+Great! The monuments object did not have municipality information until you performed the spatial join with `st_join()`. Now that the municipality information is included you can supply each municipality office with the count and coordinates of monuments they are in charge of so they can monitor and safeguard.
+
+# Task 3: Measuring distance between features
+Measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
+
+In this exercise you'll measure the distance from the Nobelparken to the Viking monuments within the 10km buffer and identify the 10 closest ones.
+
+## Instructions
+
+* Filter Nobelparken out of `db_sf` POINT feature and project to a planar CRS. 
+* Test whether the CRS of `nobel` matches the CRS of the preloaded object `viking_clip` with `st_crs()`.
+* Use `st_distance()` to compute the distance between Nobelparken to the Viking monuments within the 10km buffer .
+* Use `head()` to take a quick look at the result.
+* Identify the index of the 10 sites with the smallest distance. This may take several steps that include `sort()` and `which()` functions.
+* Use `nearest10` to pull out the rows from `viking` of the nearest Viking monument (see the `anlaegsbet` variable).
+
+```{r nearest, eval=FALSE}
+# Create the nobel object and transform to planar CRS
+nobel <- ___(___)
+
+# Test whether the CRS match
+___(viking_clip) == ___(nobel)
+
+
+# Compute the distance between Nobel and viking_clip
+d <- ___(___, viking_clip)
+
+
+# Compute the distance between the Nobelparken and the clipped viking monuments
+d <- ________(___________, nobel)
+
+# Take a quick look at the result
+________(d)
+
+# Find the index of the 10 nearest viking monuments
+
+
+# Identify the viking monuments that are the nearest, what kinds of monuments are they?
+viking_clip[_________,]$anlaegsbet
+
+# Plot the results by reruning the plot from exercise 6
+```
+
+
+Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)
+

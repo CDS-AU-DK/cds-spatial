@@ -58,20 +58,21 @@ hist(nz$Population)
 
 ```{r maps}
 # This line of code applies the 'pretty' style rounding legend numbers. Try different numbers of classes.
-tm_shape(nz) + tm_polygons(col = "Population", style = "pretty", n = 4)
+a <- tm_shape(nz) + tm_polygons(col = "Population", style = "pretty", n = 4)
 
 # "Jenks" style further smooths over the gaps
-tm_shape(nz) + tm_polygons(col = "Population", style = "jenks", n = 5)
+b <- tm_shape(nz) + tm_polygons(col = "Population", style = "jenks", n = 5)
 
 # quantile style divides into 5 even groups
-tm_shape(nz) + tm_polygons(col = "Population", style = "quantile", n=5)
+c <- tm_shape(nz) + tm_polygons(col = "Population", style = "quantile", n=5)
 
 # Equal interval style divides the distribution into even groups
-tm_shape(nz) + tm_polygons(col = "Population", style = "equal", n = 5)
+d <- tm_shape(nz) + tm_polygons(col = "Population", style = "equal", n = 5)
 
 # Write maps above to objects and plot them side by side 
 # with tmap_arrange() for better comparison
-tmap_arrange(___,___,___,____)
+tmap_arrange(___,___,___,___)
+
 ```
 
 
@@ -87,7 +88,9 @@ tmap_arrange(___,___,___,____)
 
 ```{r}
 # /Start Code/ #
-
+pdf("nzmap.pdf")
+tmap_arrange(a,b,c,d)
+dev.off()
 
 # /End Code/ #
 ```
