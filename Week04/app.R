@@ -5,7 +5,7 @@ library(sf)
 
 token <- "token"
 # Read in the hospital data
-hospital <- readr::read_rds("data/hospitals.rds") 
+hospital <- readr::read_rds("../data/hospitals.rds") 
 
 st_crs(hospital) <- 4326
 
