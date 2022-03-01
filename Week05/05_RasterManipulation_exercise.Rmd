@@ -226,9 +226,9 @@ Usefully, and you'll see this in a later analysis, you can feed `extract()` a fu
 ```{r extract, eval=FALSE}
 
 # Extract the elevation values at the sites
-________$elev  <- _______::______(elevation, sites_cp)
+________$elev  <- _______::______(elevation, mounds)
 
-# Look at the sites and extraction results
+# Look at the mounds and extraction results
 ____(mounds[_______])
 hist(____)
 ```

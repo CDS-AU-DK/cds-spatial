@@ -3,7 +3,7 @@ library(leaflet)
 library(mapboxapi)
 library(sf)
 
-token <- "token"
+token <- "pk.eyJ1IjoiYWRpdmVhIiwiYSI6ImNrcWdhNGlybjB4OG0ydnNjcWZtOG9mc3UifQ.EbNmMF9aF8th5cb-h5f1lQ"
 # Read in the hospital data
 hospital <- readr::read_rds("../data/hospitals.rds") 
 
