@@ -563,7 +563,7 @@ hh_nocar <- hh_nocar %>%
   mutate(nc2020pct = nc2020/households*100, 
          nc2021pct = nc2021/households*100)
 
-# load population
+# load population (not necessary, I just want to see)
 pop <-  read.csv2("../data/munic_pop_2022Q1.csv", sep = ",", skip = 2)
 
 names(pop)[1] <- "Name"
@@ -594,17 +594,36 @@ no_cars_pct_mun  <-  munic %>% dplyr::inner_join(hh_nocar, by = c("NAME_2"="muni
 library(mapview)
 library(leaflet)
 no_cars_pct_mun %>% 
-  dplyr::filter(nc2021pct > 25) %>% 
+  dplyr::filter(nc2021pct >= 25) %>% 
   mapview(zcol = "nc2021pct")
 
 ```
 
+Now of course, you have the whole situation in Denmark. In the next steps, you need to constrain the municipalities with carless households spatially to those in Midtjylland and check the overlap with hospital isochrones, taking the area outside these isochrones with st_difference().
 
-
-```{r thematic-map}
+```{r thematic-map-Midt}
 ## YOUR CODE HERE
 ```
+
+```{r thematic-map-Midt-sol}
+#region <- getData(country = "DNK", level = 1)
+region <- readRDS("../data/gadm36_DNK_1_sp.rds")
+
+# select Midtjylland
+Midt <- region %>% 
+  as("sf") %>% 
+  filter(VARNAME_1 == "Central Jutland")
+
+# intersect with municipalities
+no_cars_pct_midt <- no_cars_pct_mun %>% 
+  st_transform(4326) %>% 
+  st_intersection(Midt$geometry)
+
+# quick look that we got the right area
+mapview(no_cars_pct_midt, zcol = "nc2021pct")
+```
 Gosh, that was a ton of wrangling! But we are nearly there! :)
+
 
 ## Spatial overlay with sf
 
@@ -612,11 +631,11 @@ Spatial overlay is a very common operation when working with spatial data. It ca
 
 To do this, follow these steps:
 
-* doublecheck that the coordinate reference system of the `no_car_pct_mun` dataset is 4326, the same CRS used by the isochrones;
+* doublecheck that the coordinate reference system of the `no_car_pct_midt` dataset is 4326, the same CRS used by the isochrones;
 * extract only those municipalities with a percentage of households without cars of 25 percent or above;
 * use the `st_difference()` function to “cut out” areas from those municipalities that overlap the 20-minute cycling isochrones. (Union the isochrones first for neater output).
 * Once you complete this operation, visualize the result in your Mapbox map.
-* It would be nice to limit the results to Midtjylland region only :)
+
 
 
 ```{r risk-areas}
@@ -625,7 +644,7 @@ To do this, follow these steps:
 
 ```{r risk-areas-sol, echo = FALSE}
 ## Suggested progress
-target_areas <- no_cars_pct_mun %>%
+target_areas <- no_cars_pct_midt %>%
   st_transform(4326) %>%
   filter(nc2021pct >= 25) %>%
   st_difference(
@@ -639,8 +658,12 @@ mapbox_map %>%
 
 ### Questions:
 
-*3. Are there any areas that are located beyond a 20-minute bikeride of a hospital that have proportionally lower access to cars? Where are they and what is their total area?*
+*3. Are there any areas that are located beyond a 20-minute bike-ride of a hospital that have proportionally lower access to cars? Where are they and what is their total area?*
 
 *4. How would you ensure residents in these areas have reasonable access to hospitals?*
 
-
+```{r area}
+target25pct <- st_union(target_areas) # gets you area in sq kms
+mapview(target25pct)
+st_area(target25pct)/1000000
+```
