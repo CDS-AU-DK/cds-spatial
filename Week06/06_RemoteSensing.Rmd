@@ -93,7 +93,7 @@ dem <- raster(dem)
 ```{r 3D, eval = FALSE}
 # RasterVis package function plot3D() loads a neat 3D viewer, which opens in a new window
 # you may need to enable the rglwidget() if you don't see the plot3D() function working
-rglwidget()
+#rglwidget()
 plot3D(dem, rev=T, zfac=1)
 
 ```
@@ -229,7 +229,7 @@ ndvi
 plot(ndvi)
 
 # uncomment and run in 3D
-# plot3D(dem, drape=ndvi)
+plot3D(dem, drape=ndvi, zfac = 1.5)
 
 ### remove values below zero
 ndvi[ndvi <= 0] <- NA
@@ -302,7 +302,7 @@ clusters
 plot(clusters)
 
 # uncomment to plot the clusters in 3D over the DEM
-# plot3D(dem, drape=clusters, col=c("red", "green", "blue", "yellow"))
+plot3D(dem, drape=clusters, col=c("red", "green", "blue", "yellow"))
 
 # calculate the average spectral signature of 1-4 bands of growth
 ICE_mean <- zonal(myNewBrick, clusters, fun="mean")  
