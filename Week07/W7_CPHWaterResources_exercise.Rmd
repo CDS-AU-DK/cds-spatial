@@ -23,7 +23,7 @@ opts_chunk$set(echo=TRUE,
 opts_knit$set(width=75)
 ```
 
-This script visualizes the access to water resources across Copenhagen suburbs over time as a digital component for a course started in the Spring 2022, called City: Between Culture and Nature, taught by Mikkel Thelle and Mikkel Høghøj. 
+This script continues on the CPH Bathouses with a visualisation of water resources available to the residents across Copenhagen suburbs over time. It was first developed as a digital component for a course on City: Between Culture and Nature, taught by Mikkel Thelle and Mikkel Høghøj in 2021. 
 The course surveys the gradual appearance of private and public bathing facilities, toilets and communal hygienic resources in the city of Copenhagen during the 20th century.
 By editing elements in this script, you can plot and explore different aspects of past and present hygienic amenities across the suburbs in the capital of Denmark.  
 
@@ -36,20 +36,15 @@ First load the packages necessary for spatial data visualisation and analysis.
 ```{r libraries}
 library(sf)
 library(tidyverse)
-library(spatstat)
-library(spatialkernel)
 library(googlesheets4)
 library(leaflet)
 ```
 
 ## Spatial data
-Next, load your spatial data - polygons representing the suburbs of Copenhagen. 
-```{r}
-suburbs <- st_read("../data/bydel.shp", options = "ENCODING=WINDOWS-1252") # this option was added by Malte in 2022 to fix the Danish special characters on my computer
+Next, load your spatial data. They are the polygons representing the suburbs of Copenhagen in  `bydel.shp`. 
+```{r eval = FALSE}
+suburbs <- st_read(______)
 
-plot(suburbs$geometry)
-tail(suburbs)
-#write_rds(suburbs, "data/CPHsuburbs.rds")
 
 suburbs$id
 
@@ -62,8 +57,8 @@ You can read the data in from a googlesheet with `read_sheet()` function from th
 # Uncomment the lines below to read data from GDrive
 # wc <- read_sheet("https://docs.google.com/spreadsheets/d/1iFvycp6M6bF8GBkGjA2Yde2yCIhiy5_slAkGF-RUF7w/edit#gid=0",
 #                     col_types = "cnnnnnnnn")
-# write_csv(wc, "../data/wc.csv")
-wc <- read_csv("../data/wc.csv")
+
+wc <- read_csv(_________)
 
 # Check out the data and try to grasp what is being summarized in the columns
 wc
@@ -75,20 +70,20 @@ wc
 Data on access to hygienic facilities and other water resources in Copenhagen now looks good and tidy, but its *spatial resolution* is higher than the provided polygons (as in we have multiple rows that all fit within one suburb `id`). We therefore use the `group_by()` function to aggregate the data by id before we continue with any spatial operations.  Given that the dataset is in fact a time-series, and each `kvarter` has a record for a given year or decade, we need to group first by the `year` and then only by `id`. 
 
 While aggregating the finer scale data into larger units, it is convenient to generate some statistics, such as percentages of flats that have bath and wc and hot water access within each suburb. We do this using the `summarize()` function below.
-```{r}
+```{r bath-wc, eval = FALSE}
 wcdata <- wc %>% 
   group_by(year, suburb_id) %>% 
-  summarize(flats = sum(flats),
-            bath = sum(bath),
-            pct_bath = bath/flats*100,
-            wc_access=sum(wc_access),
-            pct_wc= wc_access/flats*100,
-            warmH20=sum(hot_water),
-            pct_wH20=warmH20/flats*100,
-            communal_wc = sum(wc_communal_ct),
-            communal_bath = sum(bath_communal_ct))
+  summarize(flats = _________, #total number of flats by suburb
+            bath = ___________, #total number of baths by suburb
+            pct_bath = _________, #percentage of flats with baths in a suburb
+            wc_access=_________,  #total number of toilets by suburb
+            pct_wc= _________, #percentage of flats with toilets in a suburb
+            warmH20=_________,    #total number of hot water taps by suburb
+            pct_wH20=_________,  # percentage of flats with hot water taps
+            communal_wc = _________,  #total number of communal toilets by suburb
+            communal_bath = _________ ) #total number of communal baths by suburb
 wcdata  
-#write_rds(wcdata, "data/CPH_wcdata.rds")
+
 ```
 
 
@@ -98,16 +93,8 @@ wcdata
 
 2. *In what year is the percentage of flats with access to a WC in Copenhagen the lowest, and how much it is?*
 
-```{r wc-bath-sol, echo = FALSE}
-wcdata %>% group_by(year) %>% 
-  summarize(flatsC = sum(flats),
-            bathC = sum(bath),
-            pct_bath = bathC/flatsC*100)
-
-wcdata %>% group_by(year) %>% 
-  summarize(flatsC = sum(flats),
-            wcC = sum(sum(wc_access)),
-            pct_wcC = wcC/flatsC*100)
+```{r wc-bath-CPH, echo = FALSE}
+# Your code
 
 ```
 
@@ -248,14 +235,19 @@ wc_spatial <- wc_spatial %>%
 ### ..or continue with communal resources and warm water (OPTIONAL)
 Why not practice and try plotting the flats that have access to communal baths and wc, and or hot water? Create your own map here, following the examples above.
 
+Is there any correlation between household servants and this wc dataset?
+
 ```{r}
+## YOUR CODE
+servants <- st_read("../data/Servants.shp")
+head(servants)
 
 ```
 
 <p>
 
 
-# Get additional data for Copenhagen from OpenStreetMap
+# Get additional data for Copenhagen from OpenStreetMap API
 
 The [OpenStreetMap](https://wiki.openstreetmap.org/wiki/Map_features) contains free and open spatial data for physical features on the ground, with each features' type being define using [key:value pair tags](https://wiki.openstreetmap.org/wiki/Map_features).  Each tag describes a geographic attribute of the feature being shown by that specific node, way or relation. 
 
