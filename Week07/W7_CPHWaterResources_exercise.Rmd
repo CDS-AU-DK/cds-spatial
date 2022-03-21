@@ -96,6 +96,15 @@ wcdata
 ```{r wc-bath-CPH, echo = FALSE}
 # Your code
 
+wcdata %>% group_by(year) %>% 
+  summarize(flatsC = sum(flats),
+            bathC = sum(bath),
+            pct_bathaccess=bathC/flatsC*100)
+
+wcdata %>% group_by(year) %>% 
+  summarize(flatsC = sum(flats),
+            wcC = sum(wc_access),
+            pct_wcaccessC=wcC/flatsC*100)
 ```
 
 ## Join the aggregated attribute data to their spatial representations
