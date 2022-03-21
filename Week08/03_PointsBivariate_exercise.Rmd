@@ -1,0 +1,107 @@
+---
+title: "Bivariate point patterns: Crime in Preston"
+author: "Adela Sobotkova"
+date: "11/12/2020 updated `r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task 1: Crime in Preston
+The dataset we shall use for this example consists of crimes in a 4km radius of the center of Preston, a town in north-west England. We want to look for hotspots of violent crime in the area.
+
+A `ppp` object called `preston_crime` has been constructed and you can load it using the codeblock below (remember the libraries). This is a **marked** point process, where each point is marked as either a "Violent Crime" or a "Non-violent crime". The marks for each point can be retrieved using the `marks()` function. The window is a 4km circle centered on the town center.
+
+```{r libraries-data, eval=FALSE}
+library(raster)
+library(rgdal)
+preston_crime <- readRDS("data/pcrime-spatstat.rds")
+preston_osm <- readRDS("data/osm_preston_gray.rds")
+```
+
+
+## Instructions 
+
+* Load `spatstat`.
+* Use the `summary()` function to explore the basic properties of `preston_crime`.
+* Get a table of counts of violent/non-violent crimes.
+  - Pass the point pattern, `preston_crime`, to `marks()`.
+  - Wrap that in a call to `table()` to get the counts.
+* The map looks better when the point markers are black and red, using different sizes for violent and non-violent crimes, and with the solid point marker. This marker has code number 19.
+
+```{r preston-crime, eval = FALSE}
+# Load the spatstat package
+___
+
+# Get some summary information on the dataset
+___
+
+# Get a table of marks
+___(___(preston_crime))
+
+# Define a function to create a map
+preston_map <- function(cols = c("green","red"), cex = c(1, 1), pch = c(1, 1)) {
+  plotRGB(preston_osm) # loaded above
+  plot(preston_crime, cols = cols, pch = pch, cex = cex, add = TRUE, show.window = TRUE)
+}
+
+# Draw the map with colors, sizes and plot character
+preston_map(
+  cols = c("___", "___"), 
+  cex = c(0.5, 1), 
+  pch = ___
+)
+
+```
+
+
+# Task 2: Violent crime proportion estimation
+
+One method of computing a smooth intensity surface from a set of points is to use *kernel smoothing*. Imagine replacing each point with a dot of ink on absorbent paper. Each individual ink drop spreads out into a patch with a dark center, and multiple drops add together and make the paper even darker. With the right amount of ink in each drop, and with paper of the right absorbency, you can create a fair impression of the density of the original points. In kernel smoothing jargon, this means computing a **bandwidth** and using a particular **kernel** function.
+
+To get a smooth map of violent crimes proportion, we can estimate the intensity surface for violent and non-violent crimes, and take the ratio. To do this with the `density()` function in `spatstat`, we have to split the points according to the two values of the marks and then compute the ratio of the violent crime surface to the total. The function has sensible defaults for the kernel function and bandwidth to guarantee something that looks at least plausible.
+
+## Instructions
+
+The `preston_crime` object and `spatstat` have been loaded.
+
+* The `split()` function in `spatstat` will divide a marked point pattern by a categorical mark and return a list of point patterns. Split `preston_crime` and assign the result to `crime_splits`.
+* Plot `crime_splits` by calling `plot()`, with no other arguments.
+* The `density()` function will work on a list of point patterns and return a list of densities. Calculate the densities of `crime_splits` and assign the result to crime_densities.
+* Calculate the density of the fraction of violent crimes.
+  - You can use `[[i]]` indexing to get the `i`-th density from a split list..
+  - Basic arithmetic operators (such as `+`,` -`, `*` and `/`) can be used on densities.
+  - Assign the result to `frac_violent_crime_density`.
+* Plot `frac_violent_crime_density` by calling `plot()`, with no other arguments.
+ 
+```{r crime-density-sample, eval = FALSE}
+# preston_crime has been pre-defined
+preston_crime
+
+# Use the split function to show the two point patterns
+crime_splits <- ___
+
+# Plot the split crime
+___
+
+# Compute the densities of both sets of points
+crime_densities <- ___
+
+# Calc the violent density divided by the sum of both
+frac_violent_crime_density <- crime_densities[[___]] / 
+  (crime_densities[[___]] + crime_densities[[___]])
+
+# Plot the density of the fraction of violent crime
+plot(frac_violent_crime_density)
+```
+ 
+
+Amazing crime density discovery! Notice how you can do arithmetic on the pixel image objects.
+
+Next: Spatial Segregation

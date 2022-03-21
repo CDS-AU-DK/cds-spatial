@@ -1,0 +1,164 @@
+---
+title: "Spatial statistics: Point Patterns exercises"
+author: "Adela Sobotkova"
+date: "11/12/2020 updated `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Task 1: Nearest-neighbor distributions
+
+Another way of assessing clustering and regularity is to consider each point, and how it relates to the other points. One simple measure is the distribution of the distances from each point to its nearest neighbor.
+
+The `nndist()` function in `spatstat` takes a point pattern and for each point returns the distance to its nearest neighbor. You can then plot the histogram.
+
+Instead of working with the nearest-neighbor density, as seen in the histogram, it can be easier to work with the cumulative distribution function, `G(r)`. This is the probability of a point having a nearest neighbor within a distance `r`.
+
+For a uniform Poisson process, G can be computed theoretically, and is `G(r) = 1 - exp( - lambda * pi * r ^ 2)`. You can compute G empirically from your data using `Gest()` and so compare with the theoretical value.
+
+Events near the edge of the window might have had a nearest neighbor outside the window, and so unobserved. This will make the distance to its observed nearest neighbor larger than expected, biasing the estimate of G. There are several methods for correcting this bias.
+
+Plotting the output from Gest shows the theoretical cumulative distribution and several estimates of the cumulative distribution using different edge corrections. Often these edge corrections are almost indistinguishable, and the lines overlap. The plot can be used as a quick exploratory test of complete spatial randomness.
+
+
+```{r create points, echo = FALSE}
+library(spatstat)
+disc10 <- disc(radius = 10)
+# p_poisson 
+# Compute the rate as count divided by area
+lambda <- 300/area.owin(disc10)
+# Create a point pattern object
+p_poisson <- rpoispp(lambda = lambda, win = disc10)
+plot(p_poisson)
+# p_cluster and p_regular
+# Generate clustered points from a Thomas process
+set.seed(123)
+p_cluster <- rThomas(kappa = 0.35, scale = 1, mu = 3, win = disc10)
+plot(p_cluster)
+# Regular points from a Strauss process
+set.seed(123)
+p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = disc10)
+plot(p_regular)
+```
+
+
+## Instructions
+
+Three `ppp` objects, `p_poisson`, `p_cluster`, and `p_regular` are defined for you above.
+
+* Pass the Poisson point pattern to `nndist()` to find the nearest neighbor of each point, assigning the result to `nnd_poisson`.
+* Plot the histogram of the nearest neighbor distances for the Poisson point data.
+* Estimate `G(r)` for the Poisson point pattern by passing `p_poisson` to `Gest()`. Assign the result to `G_poisson`.
+* Plot `G(r)` vs. `r` by passing the estimate (G_poisson) to `plot()`.
+* Repeat the previous four steps using the regular point pattern.
+
+
+```{r NNA exercise, eval= FALSE}
+# Point patterns are pre-defined
+p_poisson; p_regular
+
+# Calc nearest-neighbor distances for Poisson point data
+nnd_poisson <- nndist(___)
+
+# Draw a histogram of nearest-neighbor distances
+hist(___)
+
+# Estimate G(r)
+G_poisson <- Gest(___)
+
+# Plot G(r) vs. r
+plot(___)
+
+# Repeat for regular point data
+nnd_regular <- ___(___)
+___(___)
+G_regular <- ___(___)
+___(___)
+```
+
+G-force! Next you'll learn about `G`'s friends, `F`, `H`,` J`, `K`, and `L`. Notice how `G` for the regular point pattern stays low at small distance, indicating very low probabilities of finding close pairs of points.
+
+
+# Task 2: Other point pattern distribution functions - multiscalar
+A number of other functions of point patterns have been developed. They are conventionally denoted by various capital letters, including F, H, J, K and L.
+
+The K-function is defined as the expected number of points within a distance of a point of the process, scaled by the intensity. Like G, this can be computed theoretically for a uniform Poisson process and is `K(r) = pi * r ^ 2` - the area of a circle of that radius. Deviation from `pi * r ^ 2` can indicate clustering or point inhibition.
+
+Computational estimates of `K(r)` are done using the `Kest()` function.
+
+As with `G` calculations, `K`-function calculations also need edge corrections. The default edge correction in `spatstat` is generally the best, but can be slow, so we'll use the `"border"` correction for speed here.
+
+Uncertainties on K-function estimates can be assessed by randomly sampling points from a uniform Poisson process in the area and computing the K-function of the simulated data. Repeat this process 99 times, and take the minimum and maximum value of K over each of the distance values. This gives an envelope - if the `K`-function from the data goes above the top of the envelope then we have evidence for clustering. If the K-function goes below the envelope then there is evidence for an inhibitory process causing points to be spaced out. Envelopes can be computed using the `envelope()` function.
+
+The plot method for estimates of `K` uses a formula system where a dot on the left of a formula refers to `K(r)`. So the default plot uses `. ~ r`. You can compare the estimate of K to a Poisson process by plotting `. - pi * r ^ 2 ~ r`. If the data was generated by a Poisson process, then the line should be close to zero for all values of `r`.
+
+## Instructions
+
+The `ppp` objects `p_poisson`, `p_cluster`, and `p_regular` are defined for you.
+
+* Use the `Kest()` function to estimate the K function for the Poisson points.
+  -   Pass the point pattern as the first argument.
+  -   Set the `correction` argument to `"border"`.
+* Plot the K function with the default formula, `. ~ r`.
+* Plot the K function with a formula that subtracts the theoretical Poisson value, `. - pi * r ^ 2 ~ r`.
+* Use `envelope()` to simulate K for the cluster data.
+  -   The first argument is the point pattern object, `p_cluster`.    
+  -   The second argument is the estimation function, `Kest`.
+  -   As before, use `"border"` for the `correction` argument.
+* Plot the simulation envelope with a formula that subtracts the theoretical Poisson value, `. - pi * r ^ 2 ~ r`.
+* Repeat the last two steps for the regular data.
+
+```{r K function, eval=FALSE}
+# Point patterns are pre-defined
+p_poisson; p_cluster; p_regular
+
+# Estimate the K-function for the Poisson points
+K_poisson <- ___(___, correction = "___")
+
+# The default plot shows quadratic growth
+plot(K_poisson, . ~ r)
+
+# Subtract pi * r ^ 2 from the Y-axis and plot
+plot(K_poisson, . - ___ ~ r)
+
+# Compute envelopes of K under random locations
+K_cluster_env <- ___(___, ___, correction = "___")
+
+# Insert the full formula to plot K minus pi * r^2
+plot(K_cluster_env, ___)
+
+# Repeat for regular data
+K_regular_env <- ___(___, ___, correction = ___)
+
+___(___, ___)
+```
+
+It can be tricky to make sense of the Ripley's K function results and one needs to develop an eye for them. Linearizing the plot by subtracting the `. - pi * r ^ 2 ~ r` can sometimes help.  
+
+# Task 3: Tree location pattern
+
+Load a `ppp` object called `redoak` which contains the locations of trees in a woodland. Plot the tree locations and then test the hypothesis that the points are clustered against a null hypothesis of a random uniform distribution.
+
+```{r, eval= FALSE}
+redoak <- readRDS("data/redoak.rds")
+```
+
+## Possible Answers
+
+* I cannot reject the null hypothesis. 
+* I can reject the null hypothesis with p-value less than 0.1 
+* I can reject the null hypothesis with p-value less than 0.01
+
+### Hint: check out the measure from the first exercise 
+```{r Tree location pattern}
+```
+
+
+Congratulations! In the next lesson, you'll learn more about working with point patterns.
+
