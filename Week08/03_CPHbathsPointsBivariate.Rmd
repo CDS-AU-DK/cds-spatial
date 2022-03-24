@@ -39,7 +39,7 @@ library(spatstat)
 
 # Get data
 ```{r}
-baths_hist <- read_rds("../data/baths_hist.rds") # historical baths
+baths_hist <- readRDS("../data/baths_hist.rds") # historical baths
 baths_cph <- read_rds("../data/baths_cph.rds")  # baths by suburb centroids 
 baths_osm <- read_rds("../data/baths_osm.rds") # OSM baths
 ```
@@ -63,7 +63,10 @@ map_hist <-  mapview(baths_hist,
         layer.name = "Public bathhouses, early 20th century",
         homebutton = FALSE, lwd = 0.5) 
 
-sync(map_osm,map_hist)
+#sync(map_osm,map_hist)
+library(leaflet)
+leaflet() %>% addTiles() %>%
+  addCircleMarkers(data = st_transform(baths_osm, crs = 4326))
 leafsync::sync(map_osm, map_hist)
 ```
 
@@ -105,6 +108,7 @@ b_combined <- st_as_sf(combined, coords = c("X","Y"), crs = 32632)
 # Convert the sf object into a marked ppp and confirm by plotting
 b_ppp <- as.ppp(b_combined) 
 b_ppp
+plot(b_ppp)
 plot(split(b_ppp))
 ```
 
@@ -149,7 +153,7 @@ rc <- seq(0, 3000, 100)
 # Run the Kcross function
 kcross <- Kcross(b_ppp, i="HIST",j="OSM", 
                  # r=rc,
-                 correction="bord.modif") 
+                 correction="all") 
 plot(kcross)
 
 ```

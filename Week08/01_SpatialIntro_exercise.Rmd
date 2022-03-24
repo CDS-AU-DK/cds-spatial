@@ -25,15 +25,12 @@ First, you'll generate 200 points distributed uniformly in a rectangle. The rect
 
 ```{r point generation, eval = FALSE}
 n = 200
-
 xmin <- 
 xmax <- 
 ymin <- 
 ymax <- 
-
 x = runif(n, xmin, xmax)
 y = runif(n, ymin, ymax)
-
 ```
 
 
@@ -55,16 +52,12 @@ The boundaries of the rectangle have been pre-defined as `xmin`, `xmax`, `ymin`,
 
 ```{r rectangle, eval=FALSE}
 plot(x,y)
-
 ls.str()
-
 mapxy <- function(a = NA){
   plot(_, _, asp = a)
   rect(xmin, ymin, xmax, ymax)
 }
-
 mapxy(__)
-
 ```
 
 Aha! Forcing the aspect ratio to 1 should prevent the distortion of areas.
@@ -91,21 +84,16 @@ The number of points to generate and the circle's radius are shown in the script
 ```{r circle, eval = FALSE}
 # Load the spatstat package
 ___
-
 # Create this many points, in a circle of this radius
 n_points <- 300
 radius <- 10
-
 # Generate uniform random numbers up to radius-squared using the objects above
 r_squared <- runif(___, ___, ___)
 angle <- runif(n_points, 0, 2*pi)
-
 # Take the square root of the values to get a uniform spatial distribution
 x <- ___ * ___
 y <- ___ * ___
-
 plot(___); points(x, y)
-
 ```
 
 
@@ -131,14 +119,11 @@ ls.str()
 x <-  runif(300, -10,10)
 y <-  runif(300, -10,10)
 radius <- 10
-
 summary(x)
 # Set coordinates and window
 ppxy <- ppp(x = ___, y = ___, window = ___)
-
 # Test the point pattern
 qt <- ___(___)
-
 # Inspect the results
 plot(___)
 print(___)
@@ -167,13 +152,10 @@ The `area.owin()` function of `spatstat` will compute the area of a window such 
 ```{r ppoisson, eval=FALSE}
 # Create a disc of radius 10
 disc10 <- ___
-
 # Compute the rate as count divided by area
 lambda <- ___ / ___
-
 # Create a point pattern object
 ppois <- rpoispp(lambda = ___, win = ___)
-
 # Plot the Poisson point pattern
 ___
 ```
@@ -206,20 +188,16 @@ Conversely the points of a *Strauss* process cause a lowering in the probability
 ```{r clustering,eval= FALSE}
 # Create a disc of radius 10
 disc10 <- ___
-
 # Generate clustered points from a Thomas process
 set.seed(123)
 p_cluster <- ___(kappa = 0.35, scale = 1, mu = 3, win = ___)
 plot(p_cluster)
-
 # Run a quadrat test
 ___(p_cluster, alternative = "___")
-
 # Regular points from a Strauss process
 set.seed(123)
 p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = ___)
 plot(p_regular)
-
 # Run a quadrat test
 ___
 ```
@@ -241,3 +219,15 @@ Two `ppp` objects have been created called `p1` and `p2` in your /data folder. T
 2. p1 is regular, p2 is clustered 
 3. p1 is clustered, p2 is clustered
 4. p1 is clustered, p2 is regular
+© 2022 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
