@@ -149,8 +149,8 @@ plot(kc)
 
 # Task 4: Save data
 ```{r}
-saveRDS(crimeCH, "data/crimeCH.rds")
-saveRDS(chicago_crime, "data/crimeCH-spatstat.rds") # save marker planar point
+saveRDS(crimeCH, "../data/crimeCH.rds")
+saveRDS(chicago_crime, "../data/crimeCH-spatstat.rds") # save marker planar point
 chicago_crime <- readRDS("../data/crimeCH-spatstat.rds")
 ```
 
@@ -162,7 +162,7 @@ Construct a new `ppp` object out of simple feature called `chicago_crime_violent
 * filter the crimes dataset for homicide, assault, theft, robbery
 * filter away any points without coordinates
 *
-```{r}
+```{r violent-crime}
 
 crimes$`Primary Type`
 # select data and create a new column
@@ -187,7 +187,7 @@ plot(st_geometry(crime_v["crimetype"== "VIOLENT"]))
 
 
 ```
-```{r}
+```{r rasterize-violent, eval = FALSE}
 # Create rasterized views
 library(raster)
 ?rasterize()
@@ -201,7 +201,7 @@ plot(v)
 ```
 
 Make a ppp
-```{r}
+```{r ppp-violent}
 #Extract coordinates from simple feature:
 pts <- st_coordinates(crime_v)
 head(pts)
@@ -219,6 +219,7 @@ crime_violent<- ppp(pts[,1],
                             pts[,2], 
                             window = cityOwin, 
                             marks=as.factor(crime_v$crimetype))
+write_rds(crime_violent, "../data/crime_violent.rds")
 ```
 
 
@@ -287,4 +288,5 @@ plot(frac_violent_crime_density)
 
 
 Amazing crime density discovery! Notice how you can do arithmetic on the pixel image objects.
+
 Next: Spatial Segregation
