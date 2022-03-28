@@ -116,3 +116,4 @@ detach("package:seg")
 
 Good work! The simulation shows that non-violent crime dominates around my conference location.
 
+
