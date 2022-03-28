@@ -49,17 +49,17 @@ ______
 
 ## Instructions II - Crop the crime points by new circle
 
-* bring in the old sf object crime_v
-* crop it to the extent of the 5km buffer using teh circle you created above
-* convert the cropped result to ppp object 
-  -   consider using the disc() function to create a window, or convert circle c to an owin object
-  -   use crimetype column as a basis for marks, after converting it to factor
-* plot the split ppp object
+* bring in the old sf object `crime_violent` / `crime_v`
+* crop it to the extent of the 5km buffer using the circle you created above
+* convert the cropped `crime_centre` result to `ppp` object 
+  -   consider using the `disc()` function to create a window, or convert circle c to an `owin` object
+  -   use `crimetype` column as a basis for marks, after converting it to factor
+* plot the split `crime_violent` ppp object
 
 ```{r crop-ppp, eval=FALSE}
 
 # Use the circle to clip crimes
-crime_centre <- crime_v %>% 
+crime_centre <- crime_violent %>% 
   _____________(c) 
 
 
@@ -77,8 +77,9 @@ The `spseg()` function takes data and marks as two separate arguments, and you n
 
 ## Instructions
 
-* Ensure the `chicago_centre` points data is loaded. 
-* Create a column `violent` by assigning crimetype values of violent the number 1 and non-violent the number 0. Since we need two columns, create a nonviolent column doing the reverse
+* Install the `seg` package
+* Ensure the `crime_centre` points data is loaded. 
+* Create a column `violent` by assigning crimetype values of "violent" the number 1 and "non-violent" the number 0. Since we need two columns, create a nonviolent column doing the reverse.
   - select the two new columns, drop the geometry and assign the result to `cc` object 
 * Run `spseg()` function by
  - assigning the coordinates of `crime_centre` to x,

@@ -8,7 +8,7 @@ library(spatstat)
 
 # Data
 mounds <- st_read("../data/KAZ_mounds.shp")
-boundary <- st_read("../data/KAZ_surveyarea.shp")
+boundary <- st_read("../data/KAZ_units.shp")
 
 plot(mounds$geometry); plot(boundary$geometry, add =T)
 
@@ -220,28 +220,41 @@ summary(frac_good)
 ################################ Bandwidth and simulation
 library(spatialkernel)
 
-bw_choice <- spseg(mounds_ppp, 
-  h = seq(100,1000, by = 50),
-  opt = 1)
+# as 4326 CRS
+pts <- as.matrix(st_drop_geometry(m_marks[c("Long", "Lat")]))
+marks <- m_marks[["ConditionBin"]]
 
-# We need a circular window, so let's create one. 
+# select bandwidth
+h <- seq(0.002, 0.1, length=11)
+cv <- cvloglk(pts, marks, h=h)$cv
+hcv <- h[which.max(cv)]
+plot(h, cv, type="l")
 
+# projected CRS
+pts <- as.matrix(st_coordinates(m_marks))  # two column numeric matrix
+marks <- m_marks[["ConditionBin"]]  # vector of factors
+h <- seq(50, 2000, length=100)
 
-bw_choice$cv
-plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")
+# cross-validated likelihood (non-parametric estimation of segregation in mpp)
+cv <- cvloglk(pts, marks, h=h)$cv
+hcv <- h[which.max(cv)]
+plot(h, cv, type="l"); abline(v = hcv, lty = 2, col = "red")
 
-bw_choice$hcv  # best bandwidth for a ConditionBin kernel appears to be 600m
-# best kernel bandwidth for moundpt is 900
+# need a bounding box expressed as a matrix of x y polygon vertices
+box <- st_make_grid(st_buffer(mounds,100), n=1) # buffer to fully contain all points
 
-seg10 <- spseg(
-  pts = mounds_ppp, 
-  h = 600,
-  opt = 3,
-  ntest = 1000, 
-  proc = FALSE)
+#spseg function
+seg10 <- spseg(pts, marks, hcv, opt=3, ntest=10, 
+            poly = as.matrix(st_coordinates(box)[,1:2]))
 
-plotmc(seg10, "Damaged") # not very meaningful because of mixed mounds and mixed effects
-plotmc(seg10, "Good")
+plot(pts); plot(box, col = "red", add =T)
+
+## plot estimated type-specific probability surfaces
+plotphat(seg10)
+## additional with pointwise significance contour lines
+plotmc(seg10, quan=c(0.025, 0.975))
+## p-value of the Monte Carlo segregation test
+cat("\np-value of the Monte Carlo segregation test", seg10$pvalue)
 ################################### Map  ########
 
 # Get the number of columns in the data so we can 
@@ -259,11 +272,11 @@ image(prob_damage) # this georeferences the image within original coordinates!!!
 # Rearrange the p-values, but choose a p-value threshold
 p_value <- list(x = seg10$gridx,
                 y = seg10$gridy,
-                z = matrix(seg10$stpvalue[, "Damaged"] < 0.05,
+                z = matrix(seg10$stpvalue[, "Damaged"] < 0.11,
                            ncol = ncol))
 contour(p_value)
 
-image(prob_damage);contour(p_value, add = TRUE)
+image(prob_damage);contour(p_value, add = TRUE); plot(mpp, add=T)
 
 ############################### NOT NECESSARY
 
