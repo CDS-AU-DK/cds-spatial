@@ -1,0 +1,331 @@
+---
+title: "Chicago Crime: Bivariate Point patterns"
+author: "Adela Sobotkova"
+date: "March-2022 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warnings=FALSE, 
+                      message=FALSE)
+```
+
+```{r libraries-data-sol, include=FALSE}
+library(raster)
+library(sf)
+library(tidyverse)
+```
+
+
+# Task 1: Chicago crime comprehensive dataset 
+
+We will reuse a dataset we used in the first week of class: Chicago crime data from 2017. You can load from Week01 folder or use the URL to load a more recent dataset.
+You need to select specific types of crime, spatialize the dataset and view the result.
+
+## Instructions I: Get the crime data
+
+* load the `Chicagocrimes_df2017.csv` spreadsheet from Week01>data folder
+* glimpse it to check it came through as a tibble
+* check out all the different categories of crime (column `Primary Type`) to see how are they subdivided and tally them up. *Which crimes_df dominate?*
+* filter out rows that have no spatial coordinates (use Latitude) and then convert the tibble to a simple feature called `crimeCH` using Longitude and Latitude. *What CRS will you use?*
+* transform the result to a 2D plane. I recommend NAD83 UTM Zone 16N, but other planar systems are possible as well.
+
+
+
+```{r load-crimes_df, eval = FALSE}
+# Load crime data the from Chicago data portal or from root data folder
+# https://data.cityofchicago.org/Public-Safety/crimes-2017/d62x-nvdr
+crimes_df <- read_csv("../Week01/______________")
+glimpse(crimes_df)
+
+
+# Check out the crime categories
+________(crimes_df$____________)
+
+crimes_df %>%
+  group_by(_______) %>%
+  tally()
+
+
+# Select different kinds of crime
+crimeCH <- crimes_df %>%
+    filter( _____________ c("HOMICIDE","SEX OFFENSE", "NARCOTICS", "MOTOR VEHICLE THEFT", "ARSON", "LIQUOR LAW VIOLATION")) %>%
+    filter(______________)
+
+# Tally up those categories
+crimeCH %>%
+  group_by(`Primary Type`) %>%
+  tally()
+
+
+# Transform to a simple feature
+crimeCH <-  crimeCH %>%
+  st_as_sf(_________) %>%
+  st_transform(crs = __________) # hint: NAD83 UTM Zone 16N 
+
+```
+
+## Instructions II: Get Chicago city boundary
+
+In order to work with spatial data in `spatstat` library, we need to have a suitable window for our data. Chicago is not a neat square, but an elongated sloping rectangle so we will need to start from city boundary and convert it to an owin object.
+
+You can find a bunch of spatial data on Chicago at this [portal](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-City/ewy2-6yfk)
+
+* Load the city boundary from the root /data folder. *What object is it?*
+* Transform the boundary to the same CRS you used for `crimeCH` above
+* Filter the homicides in your crime dataset and plot them on top of the city boundary to confirm they overlap.
+
+```{r city-b-sol, eval = FALSE}
+city <- st_read("../data/ChicagoCity/geo_export_73f106c8-fca3-4f99-8176-1e712ec4e8f4.shp")
+
+city <- city %>% _________________
+
+plot(city$geometry); 
+plot(crimeCH %>% ________________ %>% ________________, 
+     add =T, col = "red")
+
+```
+
+## Instructions III: Create a ppp object out of select Chicago crimes
+
+In order to coerce a shapefile into an owin object you need to have both the spatstat and maptools library activated.
+
+* Coerce the `city` simple feature to an object of class “owin” (observation window)
+* Extract coordinates from the `crimeCH` simple feature
+* Create new column `fcat` in `crimeCH` using `as.factor()` on `Primary Type` to prepare it for marks column. Marks need to be a factor. 
+* Create a `ppp` object `chicago_crime` out of the coordinates, and the city window and the `fcat` column
+```{r ppp-crime, eval = FALSE}
+# Coerce city border simple feature to an object of class “owin” (observation window)
+library(spatstat)
+library(maptools)
+cityOwin <- as.owin(city)
+class(cityOwin)
+
+#Extract coordinates from simple feature:
+pts <- ____________(crimeCH)
+head(pts)
+
+#Now we can create a ‘ppp’ (point pattern) object
+p <- ppp(pts[,1], pts[,2], window=______________)
+
+
+# Create a marked point pattern object (ppp) for all crimes. It is important to coerce the marks to a factor variable.
+crimeCH$fcat <- as.factor(______________)
+chicago_crime <- ppp(pts[,1], pts[,2], window = ___________, marks=___________)
+```
+
+## Instructions IV: Look at the result
+
+You can split the `chicago_crime` object and then use either `plot()` function or `plot(density())` function to view the results
+```{r plot-crime}
+# We can split the chicago_crime object by category (crime)
+spp <- split(chicago_crime)
+plot(spp[1:4], main='')
+
+#The crime density by category:
+
+plot(density(spp[1:4]), main='')
+```
+
+## Instructions V: Summarize the data
+
+* Use the `summary()` function to explore the basic properties of `chicago_crime`.
+* Get a table of counts of violent/non-violent crimes.
+  - Pass the point pattern, `chicago_crime`, to `marks()`.
+  - Wrap that in a call to `table()` to get the counts.
+
+```{r summary-crime}
+summary(chicago_crime)
+
+table(marks(chicago_crime))
+
+```
+
+
+# Task 2: Look at the patterns in different kinds of crimes 
+Now we have a lovely marked ppp object with multiple types of crimes here and can explore different types of crimes spatially. For example, is there a massive difference between how alcohol violations are expressed spatially compared to the incidence of arson?
+
+Let's start with simple Ripley's K function on each subset of crime
+
+* Run Kest() function on the LIQUOR LAW VIOLATION subset of spp
+* Run Kest() function on the ARSON subset of spp
+
+```{r K-plots, eval = FALSE}
+#K-plots for liquor violations and Arson
+
+spatstat.options(checksegments = FALSE)
+ktheft <- Kest(_______________)
+plot(ktheft)
+
+
+karson <- Kest(_____________)
+plot(karson)
+```
+
+# Task 3: Look at criminal activity correlation
+
+With Ripley's K done, let's look at the cross function with the research question of "Does drinking lead to arson or another crime"? How would test for spatial dependency of these two types of offensive behavior?
+
+```{r K-cross, eval = FALSE}
+kc <- Kcross(chicago_crime, i = _________, j = ______________)
+plot(kc)
+```
+
+# Task 4: Save data
+Lovely work, you might want to save some of the intermediary datasets so you don't have to recreate them in the future.
+```{r save-data}
+# saveRDS(crimeCH, "../data/crimeCH.rds")
+# saveRDS(chicago_crime, "../data/crimeCH-spatstat.rds") # save marker planar point
+# chicago_crime <- readRDS("../data/crimeCH-spatstat.rds")
+```
+
+
+# Task 5: Violent and non-violent Crime in Chicago
+
+Imagine you are going to downtown Chicago next weekend and you want to know what is the probability you will encounter violent criminal activity as you roam within the radius of 5 km from your conference center.
+
+We shall now simplify the dataset into a bivariate marked `ppp` object and assess this very probability.
+
+Construct a new `ppp` object out of simple feature called `chicago_crime_violent` by selecting homicide, assault, theft and robbery out of the Chicago crimes dataset and converting to simple feature (or you pick up the simple feature, filter out the needed crimes and use `case_when()` function to create a new column with only the wanted categories). 
+Make this object into a **marked** point process, marking homicide and assault as a "Violent Crime", and theft and robbery as "Non-violent crime". The marks for each point can be retrieved using the `marks()` function. The window is a 5km circle centered on the town center.
+
+## Instructions I: create violent/non-violent categories
+
+* filter the `crimes_df` dataset selecting only homicide, assault, theft, and robbery
+* create new column `crimetype`, assigning it VIOLENT label for homicide and assault, and NON-VIOLENT label for theft and robbery  
+* filter away any points without coordinates
+* transform to an sf feature called `crime_v` using the NAD83 UTM Zone 16N (EPSG 26916) coordinate system (or equivalent for Chicago)
+* view the features for sanity check
+```{r violent-crime, eval = FALSE}
+# select data and create a new column
+crime_v <- crimes_df %>%
+    filter(`Primary Type` %in% c("HOMICIDE","ASSAULT", "THEFT", "ROBBERY")) %>%
+    filter(!is.na(Latitude)) %>%
+  mutate(crimetype = case_when(
+    `Primary Type` == _________ ~ _________,
+    `Primary Type` == _________ ~ _________,
+    `Primary Type` == _________  ~ _________,
+    `Primary Type` == _________ ~ _________))
+
+# make into simple features
+crime_v <-  crime_v  %>% 
+  st_as_sf(_________) %>%
+  st_transform(_________) # NAD83 UTM Zone 16N (EPSG 26916)
+
+# view the simple features
+plot(st_geometry(crime_v["crimetype"== "NON-VIOLENT"]))
+plot(st_geometry(crime_v["crimetype"== "VIOLENT"]))
+
+```
+
+## Instructions II (optional):
+
+* more viewing options include rasterisation
+```{r rasterize-violent, eval = FALSE}
+# Create rasterized views
+library(raster)
+?rasterize()
+r <- raster(ncol= 50, nrow = 200)
+extent(r) <- extent(city)
+nv <- rasterize(st_coordinates(crime_v["crimetype"== "NON-VIOLENT"]), r)
+v <- rasterize(st_coordinates(crime_v["crimetype"== "VIOLENT"]), r)
+
+plot(nv)
+plot(v)
+```
+
+## Instructions III: ppp crime_violent
+
+* back on track: let's make `crime_v` into a `ppp` object
+* extract coordinates, assign a window and create a factor out of the field you'd like to use for marks
+* create the ppp `crime_violent`, view it and save it if good!
+```{r ppp-violent, eval = FALSE}
+#Extract coordinates from simple feature:
+pts <- st_coordinates(crime_v)
+head(pts)
+
+#Now we can create a ‘ppp’ (point pattern) object
+p <- ppp(pts[,1], pts[,2], window=cityOwin)
+
+
+# Create a marked point pattern object (ppp) for all crimes_df. It is important to coerce the marks to a factor variable.
+crime_v$fcat <- as.factor(_________)
+
+crime_violent<- ppp(pts[,1], 
+                            pts[,2], 
+                            window = cityOwin, 
+                            marks=as.factor(crime_v$crimetype))
+#write_rds(crime_violent, "../data/crime_violent.rds")
+```
+
+
+# Task 6: Violent crime proportion estimation
+
+One method of computing a smooth intensity surface from a set of points is to use *kernel smoothing*. Imagine replacing each point with a dot of ink on absorbent paper. Each individual ink drop spreads out into a patch with a dark center, and multiple drops add together and make the paper even darker. With the right amount of ink in each drop, and with paper of the right absorbency, you can create a fair impression of the density of the original points. In kernel smoothing jargon, this means computing a **bandwidth** and using a particular **kernel** function.
+
+To get a smooth map of `crime_violent` proportion, we can estimate the intensity surface for violent and non-violent crimes, and take the ratio. To do this with the `density()` function in `spatstat`, we have to split the points according to the two values of the marks and then compute the ratio of the violent crime surface to the total. The function has sensible defaults for the kernel function and bandwidth to guarantee something that looks at least plausible.
+
+## Instructions
+
+The `crime_violent` object and `spatstat` have been loaded.
+
+* The `split()` function in `spatstat` will divide a marked point pattern by a categorical mark and return a list of point patterns. Split `crime_violent` and assign the result to `crime_splits`. 
+  - You can subset the crime dataset to 1000 first points to actually see a pattern in the plot that follows next.
+* Plot `crime_splits` by calling `plot()`, with no other arguments.
+* The `density()` function will work on a list of point patterns and return a list of densities. Calculate the densities of `crime_splits` and assign the result to crime_densities.
+* Calculate the density of the fraction of violent crime.
+  - You can use `[[i]]` indexing to get the `i`-th density from a split list..
+  - Basic arithmetic operators (such as `+`,` -`, `*` and `/`) can be used on densities.
+  - Assign the result to `frac_violent_crime_density`.
+* Plot `frac_violent_crime_density` by calling `plot()`, with no other arguments.
+ 
+```{r crime-density-sample, eval = FALSE}
+# crime_violent has been pre-defined
+crime_violent
+
+# Use the split() function to show the two point patterns. Subset to first 1000 points if you actually want to *see* the pattern.
+crime_splits <- ___
+
+# Plot the split crime
+___
+
+# Compute the densities of both sets of points
+crime_densities <- ___
+
+# Calc the violent density divided by the sum of both
+frac_violent_crime_density <- crime_densities[[___]] / 
+  (crime_densities[[___]] + crime_densities[[___]])
+
+# Plot the density of the fraction of violent crime
+plot(frac_violent_crime_density)
+```
+ 
+
+```{r crime-density-sample-sol, echo = FALSE}
+# crime_violent has been pre-defined
+crime_violent
+
+# Use the split function to show the two point patterns
+crime_splits <- split(crime_violent[1:1000])
+
+
+# Plot the split crime
+plot(crime_splits)
+
+# Compute the densities of both sets of points
+crime_densities <- density(crime_splits)
+
+# Calc the violent density divided by the sum of both
+frac_violent_crime_density <- crime_densities[["VIOLENT"]] / 
+  (crime_densities[["NON-VIOLENT"]] + crime_densities[["VIOLENT"]])
+
+# Plot the density of the fraction of violent crime
+plot(frac_violent_crime_density)
+str(crime_densities)
+```
+
+
+Amazing crime density discovery! Notice how you can do arithmetic on the pixel image objects.
