@@ -69,12 +69,15 @@ hull_sm <- st_convex_hull(st_union(mounds_int))
 
 plot(mounds_int$geometry);plot(hull_sm, add=TRUE)
 
-# Create a window
-library(maptools)
+# Create a window out of a bbox/convexhull
+
+library(maptools) # maptools can bridge between sf and spatstat
 ?owin()
-?as.owin()
-mw <- owin(as(hull_sm, "Spatial"))
-mw <- as.owin(as(hull_sm, "Spatial"))
+?as.owin()  
+mw <- as.owin(as(st_sf(hull_sm), "Spatial"))
+mw <- as.owin(as_Spatial(st_sf(hull_sm)))
+
+plot(mounds_mpp)
 
 # Erroring out? No worries! Check out this vignette:
 # https://rdrr.io/cran/spatstat/man/convexhull.xy.html
@@ -93,9 +96,8 @@ plot(owin(), main="convexhull.xy(x,y)", lty=2)
 plot(w)
 points(x,y, add=TRUE)
 
-###################
+#################### Finally, create the ppp
 
-# Finally, create the ppp
 ?ppp
 ?as.ppp()
 
@@ -106,7 +108,7 @@ m_ppp <- as.ppp(st_coordinates(mounds_int), W=w)
 plot(m_ppp)
 
 
-# Test clustering in a couple ways
+# Test clustering in a couple ways on the ppp
 library(spatstat)
 
 testnnd2 <- nndist(m_ppp)
@@ -163,8 +165,6 @@ head(data)
 tail(data)
 missing <- data[is.na(data$Robbed), "MoundID"]
 
-levels(factor(data$LandUse))
-data$LandUse <- factor(data$LandUse)
 levels(factor(data$Robbed))
 
 data <- data %>% 
@@ -181,7 +181,7 @@ m_marks <- mounds_int %>%
   inner_join(data[,2:8], by="TRAP_Code")
 dim(m_marks)
 
-m_marks
+head(m_marks)
 names(m_marks)
 
 
@@ -189,17 +189,16 @@ mounds_mpp <- as.ppp(st_coordinates(m_marks), W=w)
 plot(mounds_mpp)
 mounds_mpp
 
-marks(mounds_mpp) <- m_marks$ConditionBin # assigning marks by vector
 mpp <- mounds_mpp
+marks(mounds_mpp) <- m_marks$ConditionBin # assigning marks by vector
 marks(mpp)<- m_marks$Robbed2
 
 # works better than by dataframe, or perhaps it is happy with a single mark at a time
 
 ##################################### Spatial Segregation
-
-mounds_robbed <- split(mounds_mpp, "ConditionBin")
-plot(split(mounds_mpp))
-mounds_condition <- split(m_ppp, "ConditionBin")
+plot(split(mpp))
+mounds_robbed <- split(mpp)
+mounds_condition <- split(mounds_mpp)
 
 plot(density(mounds_robbed))
 plot(density(mounds_condition))
@@ -216,12 +215,17 @@ plot(frac_m_notrobbed)
 frac_good <- condition_density[[2]]/  #not robbed divided by sum
   (condition_density[[1]] + condition_density[[2]])
 plot(frac_good)
+summary(frac_good)
 
 ################################ Bandwidth and simulation
+library(spatialkernel)
 
 bw_choice <- spseg(mounds_ppp, 
   h = seq(100,1000, by = 50),
   opt = 1)
+
+# We need a circular window, so let's create one. 
+
 
 bw_choice$cv
 plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")

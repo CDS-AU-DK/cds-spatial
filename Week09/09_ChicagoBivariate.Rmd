@@ -157,11 +157,12 @@ chicago_crime <- readRDS("../data/crimeCH-spatstat.rds")
 
 # Task 5: Create a new ppp object for Chicago crime
 
-Construct a new `ppp` object out of simple feature called `chicago_crime_violent` which you created by selecting homicide, assault, theft and robbery out of the Chicago crimes dataset. Make this object into a **marked** point process, marking homicide and assault as a "Violent Crime", and theft and robbery as "Non-violent crime". The marks for each point can be retrieved using the `marks()` function. The window is a 4km circle centered on the town center.
+Construct a new `ppp` object out of simple feature called `chicago_crime_violent` by selecting homicide, assault, theft and robbery out of the Chicago crimes dataset and converting to simple feature. Make this object into a **marked** point process, marking homicide and assault as a "Violent Crime", and theft and robbery as "Non-violent crime". The marks for each point can be retrieved using the `marks()` function. The window is a 4km circle centered on the town center.
 
 * filter the crimes dataset for homicide, assault, theft, robbery
 * filter away any points without coordinates
-*
+* transform to sf feature using the NAD83 UTM Zone 16N (EPSG 26916) coordinate system (or equivalent for Chicago)
+* view the features for sanity check
 ```{r violent-crime}
 
 crimes$`Primary Type`
@@ -185,8 +186,9 @@ crime_v <-  crime_v  %>%
 plot(st_geometry(crime_v["crimetype"== "NON-VIOLENT"]))
 plot(st_geometry(crime_v["crimetype"== "VIOLENT"]))
 
-
 ```
+
+* more viewing options include rasterisation
 ```{r rasterize-violent, eval = FALSE}
 # Create rasterized views
 library(raster)
@@ -200,7 +202,9 @@ plot(nv)
 plot(v)
 ```
 
-Make a ppp
+* back on track: let's make `crime_v` into a `ppp` object
+* extract coordinates, assign a window and create a factor out of the field you'd like to use for marks
+* create the ppp `crime_violent`, view it and save it if good!
 ```{r ppp-violent}
 #Extract coordinates from simple feature:
 pts <- st_coordinates(crime_v)
@@ -233,7 +237,8 @@ To get a smooth map of violent crimes proportion, we can estimate the intensity 
 
 The `crime_violent` object and `spatstat` have been loaded.
 
-* The `split()` function in `spatstat` will divide a marked point pattern by a categorical mark and return a list of point patterns. Split `crime_violent` and assign the result to `crime_splits`. You can subset the crime dataset to 1000 first points to actually see a pattern in the plot tat follows next.
+* The `split()` function in `spatstat` will divide a marked point pattern by a categorical mark and return a list of point patterns. Split `crime_violent` and assign the result to `crime_splits`. 
+  - You can subset the crime dataset to 1000 first points to actually see a pattern in the plot tat follows next.
 * Plot `crime_splits` by calling `plot()`, with no other arguments.
 * The `density()` function will work on a list of point patterns and return a list of densities. Calculate the densities of `crime_splits` and assign the result to crime_densities.
 * Calculate the density of the fraction of violent crimes.
@@ -246,7 +251,7 @@ The `crime_violent` object and `spatstat` have been loaded.
 # crime_violent has been pre-defined
 crime_violent
 
-# Use the split function to show the two point patterns
+# Use the split() function to show the two point patterns. Subset to first 1000 points if you actually want to *see* the pattern.
 crime_splits <- ___
 
 # Plot the split crime
@@ -284,9 +289,8 @@ frac_violent_crime_density <- crime_densities[["VIOLENT"]] /
 
 # Plot the density of the fraction of violent crime
 plot(frac_violent_crime_density)
+str(crime_densities)
 ```
 
 
 Amazing crime density discovery! Notice how you can do arithmetic on the pixel image objects.
-
-Next: Spatial Segregation
