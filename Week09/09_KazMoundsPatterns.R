@@ -58,7 +58,7 @@ plot(testK , . - pi * r ^ 2 ~ r )
 
 ?st_simplify()
 b <- st_simplify(boundary, dTolerance = 100)
-b <- st_union(bound)
+b <- st_union(boundary)
 b_buff <- st_buffer(b, dist= 500)
 plot(mounds$geometry);plot(b_buff, add=TRUE)
 
@@ -77,7 +77,6 @@ library(maptools) # maptools can bridge between sf and spatstat
 mw <- as.owin(as(st_sf(hull_sm), "Spatial"))
 mw <- as.owin(as_Spatial(st_sf(hull_sm)))
 
-plot(mounds_mpp)
 
 # Erroring out? No worries! Check out this vignette:
 # https://rdrr.io/cran/spatstat/man/convexhull.xy.html
