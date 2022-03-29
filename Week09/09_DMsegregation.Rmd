@@ -1,0 +1,281 @@
+---
+title: "Dis Manibus Segregation in RE"
+author: "Adela Sobotkova"
+date: "29/03/2022"
+output:
+  rmdformats::readthedown:
+  highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+In this exercise you will map the ancient equivalent of Twitter data: the ancient inscriptions. Ancient people of class, education, and means liked to advertise their achievements and life milestones as well as their sorrows via the means of texts inscribed in stone. These epigraphic monuments were often placed near inhabited areas, roads, and gathering places where they were likely to attract the largest audience. The location of these self-expressions in space and time is a reasonable indicator of changing economic prosperity of the commissioning communities. In this exercise, you will explore how these ancient inscriptions spatially correspond to the distribution of ancient cities and settlements.  
+
+```{r libraries, include=FALSE}
+library(sf)
+library(raster)
+library(tidyverse)
+library(leaflet)
+```
+
+
+# Task 1: Get spatial data for Roman Provinces
+
+
+```{r load-province-data}
+provinces <- st_read("https://raw.githubusercontent.com/pelagios/magis-pleiades-regions/main/pleiades-regions-magis-pelagios.geojson")
+plot(provinces$geometry)
+unique(provinces$name) %>% sort()
+Spain <- provinces %>% filter(name %in% c("Lusitania", "Baetica", "Hispaniae")) %>% st_transform(3035)
+plot(Spain$geometry); plot(inscriptions$geometry, add =T)
+
+RE <- st_union(provinces) %>% st_transform(3035)
+plot(RE)
+```
+
+# Task 2: Load ancient cities and convert to sf object
+John Hanson has created a dataset of all cities in the ancient Mediterranean and made it available online. You will download this dataset and convert it into an sf object in order to compare with the inscriptions on the basis of location.  
+
+* Use `read_csv()` to load `Hanson2016_Cities_OxREP.csv` dataset from the provided URL and assign it to `cities` object
+
+```{r load-cities, eval=FALSE}
+cities <- as.data.frame(read_csv("http://oxrep.classics.ox.ac.uk/oxrep/docs/Hanson2016/________________"))
+```
+
+... then reproject this data to EPSG 3035
+```{r prj-cities, eval=FALSE}
+# Convert the table into an sf object on the basis of X and Y columns
+cities_sf <- ________(cities, coords = c("Longitude (X)", "Latitude (Y)"))
+
+# Define the projection of Lat/Long coordinates as EPSG 4326
+cities_sf4326<- st_set_crs(cities_sf, ________)
+
+# Transform the projection to a 2D projection using EPSG 3035
+cities_sf3035<- st_transform(cities_sf4326, ___________)
+
+# Verify the projection is 'projected' not 'geographic'
+______(cities_sf3035)
+```
+
+
+### Question: 
+*1. What are the measurement units of the `cities_sf3035` object?*
+
+
+# Task 3: Create a buffer around each city and inspect the result
+
+As each city and inscription corresponds to a dot on the map, the best way to grab and review the inscriptions will be by creating a buffer around each city and then selecting the inscriptions that fall into the buffer as belonging to the city. 
+
+* Create a buffer around the `cities_sf3035` geometry with `st_buffer()` , setting the `dist` argument to the desired radius of 5000m.
+* Plot the first ten buffers and the first ten cities on top for a quick review. Can you tell that the buffers are really 5000m?
+
+```{r buff, eval=FALSE}
+# Make buffer of 5 km. Check the units of your object to correctly assign value to dist
+cities_5km<- st_buffer(_____,dist = _________)
+
+# Plot the first 10 buffers and cities to check result 
+plot(___________(___________)[1:10], col = "yellow")
+plot(___________(___________)[1:10], pch=20, cex = 0.1, add = TRUE)
+
+```
+
+
+# Task 4: Load DM inscriptions
+
+```{r DM-Spain}
+# Load DM data for Spain
+library(jsonlite)
+#list_json <- jsonlite::fromJSON("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_dis_manibus_2021-08-12.json")
+inscriptions = as_tibble(list_json)
+
+# Check the first couple lines and column names
+head(inscriptions)
+head(unlist(inscriptions$coordinates))
+inscriptions$coordinates[[1]][2]
+
+# Wrangle the coordinates into a 2-column format - practice on a small dataset
+i_sm <- inscriptions %>% 
+  slice(1:100) %>% 
+  separate(col = coordinates, into = c("longitude","latitude"), sep = ",") %>%
+  mutate(latitude = as.numeric(gsub("_________","",latitude)),
+         longitude = as.numeric(gsub("_________","",longitude))) 
+# Get just Spain
+
+library(tidyverse)
+inscriptions <- read_csv("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_DM_Spain.csv")
+head(inscriptions)
+names(inscriptions)
+
+# Make a simple feature
+library(sf)
+inscriptions <- inscriptions %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_transform(3035)
+
+
+ch <- st_buffer(st_convex_hull(st_union(inscriptions)),100)
+b <- st_make_grid(inscriptions, n=1)
+plot(inscriptions$geometry); plot(b, add=T); plot(ch, border = "green", add=T)
+```
+
+Convert data into a ppp object
+```{r}
+# Libraries
+library(spatstat)
+library(spatialkernel)
+
+# Data
+pts <- as.matrix(st_coordinates(inscriptions))
+marks <- inscriptions[["form_dis_manibus"]]
+
+# Scan from 1000m to 10000m in steps of 1000m
+?spseg()
+
+bw_choice <- spatialkernel::spseg(pts, marks, 
+    h = seq(1000, 100000, by = 1000),
+    opt = 1)
+
+# Plot the results and highlight the best bandwidth
+plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")
+
+# Print the best bandwidth
+print(bw_choice$hcv)  # 6000m
+```
+
+# Task 5: DM formula proportion estimation
+
+```{r optimum-bandwith-sol, echo=FALSE, }
+
+# Set the correct bandwidth and run for 10 simulations only
+seg10 <- spatialkernel::spseg(
+    pts = pts,
+    marks = marks,
+    h = 6000,
+    opt = 3,
+    ntest = 10,
+    proc = FALSE,
+    poly = as.matrix(st_coordinates(ch)[,1:2]))
+
+seg10 <- readRDS("../data/DMseg10.rds")
+
+# Plot the segregation map for different DIS MANIBUS formulae
+plotmc(seg10, "dis manibus")
+plotmc(seg10, "dis manibus sacrum")
+plotmc(seg10, "d m s")
+
+unique(marks)
+# save the seg10 object
+#saveRDS(seg10, "../data/DMseg10.rds")
+```
+
+Good work! The simulation shows that dms is relatively more frequent in the south of Spain, while dis manibus has a higher proportion in the north.
+
+
+# Task 6: DM Segregation- Mapping segregation
+
+With a base map and some image and contour functions we can display both the probabilities and the significance tests over the area with more control than the `plotmc()` function.
+
+The `seg` object is a list with several components. The X and Y coordinates of the grid are stored in the `$gridx` and `$gridy` elements. The probabilities of each class of data (violent or non-violent crime) are in a matrix element `$p` with a column for each class. The p-value of the significance test is in a similar matrix element called `$stpvalue`. Rearranging columns of these matrices into a grid of values can be done with R's matrix() function. From there you can construct list objects with a vector `$x` of X-coordinates, `$y` of Y-coordinates, and `$z` as the matrix. You can then feed this to `image()` or `contour()` for visualization.
+
+This process may seem complex, but remember that with R you can always write functions to perform complex tasks and those you may repeat often. For example, to help with the mapping in this exercise you will create a function that builds a map from four different items.
+
+## Instructions
+
+* Inspect the segregation object. 
+  - Use `str()` to see the structure of `seg`. 
+  - Set `ncol` as the length of one of the elements of `seg`.
+* Create prob_violent as a list with 
+  - x as the gridx element of `seg`. 
+  - y as the gridy element. 
+  - z as a matrix with the "dis manibus" column of the p element.
+* Create `p_value` as in the previous step, except that the `z` element is logical, and `TRUE` when the `stpvalue` element of seg is less than 0.05.
+* Call the `segmap()` function shown in the script to find areas where the probability of a crime being violent is above 0.15. Use 0.05 as the lower probability.
+
+```{r segmap-dismanibus, echo=FALSE}
+# Inspect the structure of the spatial segregation object
+str(seg10)
+
+# Get the number of columns in the data so we can rearrange to a grid
+ncol <- length(seg10$gridy)
+
+# Rearrange the probability column into a grid
+prob_dismanibus <- list(x = seg10$gridx,
+                     y = seg10$gridy,
+                     z = matrix(seg10$p[, "dis manibus"],
+                                ncol = ncol))
+# You have basically georeferenced the image within data's coordinates
+image(prob_dismanibus)
+
+# Rearrange the p-values, but choose a p-value threshold
+p_value <- list(x = seg10$gridx,
+                y = seg10$gridy,
+                z = matrix(seg10$stpvalue[, "dis manibus"]< 0.11,
+                                ncol = ncol))
+contour(p_value)
+
+
+# Create a mapping function
+segmap <- function(prob_list, pv_list, low, high){
+
+  # background map
+  #library(raster)
+  plot(st_union(Spain$geometry))
+  
+  # p-value areas
+  image(pv_list, 
+        col = c("#00000000", "#FF808080"), add = TRUE) 
+
+  # probability contours
+  contour(prob_list,
+          levels = c(low, high),
+          col = c("#206020", "red"),
+          labels = c("Low", "High"),
+          add = TRUE)
+
+  # boundary window
+  plot(c, add = TRUE)
+}
+
+# Map the probability and p-value
+segmap(prob_dismanibus, p_value, 0.05, 0.15)
+```
+```{r segmap-dismanibussacr, echo=FALSE}
+# Inspect the structure of the spatial segregation object
+str(seg10)
+
+# Get the number of columns in the data so we can rearrange to a grid
+ncol <- length(seg10$gridy)
+
+# Rearrange the probability column into a grid
+prob_dismanibuss <- list(x = seg10$gridx,
+                     y = seg10$gridy,
+                     z = matrix(seg10$p[, "dis manibus sacrum"],
+                                ncol = ncol))
+# You have basically georeferenced the image within data's coordinates
+image(prob_dismanibuss)
+
+# Rearrange the p-values, but choose a p-value threshold
+p_value <- list(x = seg10$gridx,
+                y = seg10$gridy,
+                z = matrix(seg10$stpvalue[, "dis manibus sacrum"]< 0.11,
+                                ncol = ncol))
+contour(p_value)
+
+
+# Map the probability and p-value
+segmap(prob_dismanibuss, p_value, 0.11, 0.15)
+```
