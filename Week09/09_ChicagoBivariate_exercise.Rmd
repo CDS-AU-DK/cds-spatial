@@ -27,15 +27,14 @@ You need to select specific types of crime, spatialize the dataset and view the 
 
 ## Instructions I: Get the crime data
 
-* load the `Chicagocrimes_df2017.csv` spreadsheet from Week01>data folder
+* load the `ChicagoCrime2017.csv` spreadsheet from Week01>data folder
 * glimpse it to check it came through as a tibble
-* check out all the different categories of crime (column `Primary Type`) to see how are they subdivided and tally them up. *Which crimes_df dominate?*
+* check out all the different categories of crime (column `Primary Type`) to see how are they subdivided and tally them up. *Which crimes dominate?*
 * filter out rows that have no spatial coordinates (use Latitude) and then convert the tibble to a simple feature called `crimeCH` using Longitude and Latitude. *What CRS will you use?*
 * transform the result to a 2D plane. I recommend NAD83 UTM Zone 16N, but other planar systems are possible as well.
 
 
-
-```{r load-crimes_df, eval = FALSE}
+```{r load-crimes, eval = FALSE}
 # Load crime data the from Chicago data portal or from root data folder
 # https://data.cityofchicago.org/Public-Safety/crimes-2017/d62x-nvdr
 crimes_df <- read_csv("../Week01/______________")
@@ -251,7 +250,7 @@ head(pts)
 p <- ppp(pts[,1], pts[,2], window=cityOwin)
 
 
-# Create a marked point pattern object (ppp) for all crimes_df. It is important to coerce the marks to a factor variable.
+# Create a marked point pattern object (ppp) for all crimes. It is important to coerce the marks to a factor variable.
 crime_v$fcat <- as.factor(_________)
 
 crime_violent<- ppp(pts[,1], 
