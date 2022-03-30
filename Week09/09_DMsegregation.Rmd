@@ -96,41 +96,65 @@ plot(___________(___________)[1:10], pch=20, cex = 0.1, add = TRUE)
 
 # Task 4: Load DM inscriptions
 
-```{r DM-Spain}
+```{r DM-Roman Empire}
 # Load DM data for Spain
 library(jsonlite)
+
+# massive 225Mb datset - disrecommended
 #list_json <- jsonlite::fromJSON("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_dis_manibus_2021-08-12.json")
+
+# small 40kb new dataset from March 2022
+list_json <- jsonlite::fromJSON("C:/Users/au616760/Documents/RStudio/SDAM/EDH_exploration/data/EDH_DM.json")
+
+
+# small temporal slices
+list_json <- jsonlite::fromJSON("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_dis_manibus_2021-08-12.json")
 inscriptions = as_tibble(list_json)
 
 # Check the first couple lines and column names
 head(inscriptions)
-head(unlist(inscriptions$coordinates))
-inscriptions$coordinates[[1]][2]
 
 # Wrangle the coordinates into a 2-column format - practice on a small dataset
-i_sm <- inscriptions %>% 
-  slice(1:100) %>% 
-  separate(col = coordinates, into = c("longitude","latitude"), sep = ",") %>%
-  mutate(latitude = as.numeric(gsub("_________","",latitude)),
-         longitude = as.numeric(gsub("_________","",longitude))) 
-# Get just Spain
+# i_sm <- inscriptions %>% 
+#   slice(1:100) %>% 
+#   separate(col = coordinates, into = c("longitude","latitude"), sep = ",") %>%
+#   mutate(latitude = as.numeric(gsub("_________","",latitude)),
+#          longitude = as.numeric(gsub("_________","",longitude))) 
 
+# Make a simple feature
+library(sf)
+inscriptions <- inscriptions %>% 
+  filter(!is.na(longitude)) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_transform(3035)
+
+plot(inscriptions$geometry); plot(RE, add =T)
+```
+
+## Get Spain for test
+```{r Spain, eval = FALSE}
+# Get just Spain
 library(tidyverse)
-inscriptions <- read_csv("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_DM_Spain.csv")
+
+# On Home Dell
+# inscriptions <- read_csv("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_DM_Spain.csv")
+# on Office Dell
+inscriptions <- read_csv("C:/Users/au616760/Documents/RStudio/SDAM/EDH_exploration/data/EDH_DM_Spain.csv")
 head(inscriptions)
 names(inscriptions)
 
 # Make a simple feature
 library(sf)
 inscriptions <- inscriptions %>% 
+  filter(!is.na(longitude)) %>% 
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
   st_transform(3035)
-
 
 ch <- st_buffer(st_convex_hull(st_union(inscriptions)),100)
 b <- st_make_grid(inscriptions, n=1)
 plot(inscriptions$geometry); plot(b, add=T); plot(ch, border = "green", add=T)
 ```
+
 
 Convert data into a ppp object
 ```{r}
@@ -142,6 +166,28 @@ library(spatialkernel)
 pts <- as.matrix(st_coordinates(inscriptions))
 marks <- inscriptions[["form_dis_manibus"]]
 
+# Window
+REbuff <- st_buffer(RE, 500)
+plot(REbuff); plot(ch, add =T)
+w <- as.owin(as_Spatial(st_sf(ch)))
+
+# density
+library(maptools)
+i_ppp <- as.ppp(pts, W = w)
+marks(i_ppp) <- as.factor(marks)
+plot(i_ppp)
+plot(density(i_ppp))
+
+```
+## Basic density
+```{r}
+i_spp <- split(i_ppp)
+plot(density(i_spp))
+```
+
+
+## Look for optimal bandwidth
+```{r}
 # Scan from 1000m to 10000m in steps of 1000m
 ?spseg()
 
@@ -173,13 +219,14 @@ seg10 <- spatialkernel::spseg(
 seg10 <- readRDS("../data/DMseg10.rds")
 
 # Plot the segregation map for different DIS MANIBUS formulae
+unique(marks)
 plotmc(seg10, "dis manibus")
 plotmc(seg10, "dis manibus sacrum")
-plotmc(seg10, "d m s")
+plotmc(seg10, "dii manes")
 
-unique(marks)
+
 # save the seg10 object
-#saveRDS(seg10, "../data/DMseg10.rds")
+#saveRDS(seg10, "../data/DMREseg10.rds")
 ```
 
 Good work! The simulation shows that dms is relatively more frequent in the south of Spain, while dis manibus has a higher proportion in the north.
@@ -223,7 +270,7 @@ image(prob_dismanibus)
 # Rearrange the p-values, but choose a p-value threshold
 p_value <- list(x = seg10$gridx,
                 y = seg10$gridy,
-                z = matrix(seg10$stpvalue[, "dis manibus"]< 0.11,
+                z = matrix(seg10$stpvalue[, "dis manibus"]<= 0.1,
                                 ncol = ncol))
 contour(p_value)
 
@@ -233,8 +280,8 @@ segmap <- function(prob_list, pv_list, low, high){
 
   # background map
   #library(raster)
-  plot(st_union(Spain$geometry))
-  
+  #plot(st_union(Spain$geometry))
+  plot(REbuff)
   # p-value areas
   image(pv_list, 
         col = c("#00000000", "#FF808080"), add = TRUE) 
@@ -251,7 +298,7 @@ segmap <- function(prob_list, pv_list, low, high){
 }
 
 # Map the probability and p-value
-segmap(prob_dismanibus, p_value, 0.05, 0.15)
+segmap(prob_dismanibus, p_value, 0.11, 0.15)
 ```
 ```{r segmap-dismanibussacr, echo=FALSE}
 # Inspect the structure of the spatial segregation object
@@ -279,3 +326,242 @@ contour(p_value)
 # Map the probability and p-value
 segmap(prob_dismanibuss, p_value, 0.11, 0.15)
 ```
+
+
+# Task 7: Dissimilarity index
+
+```{r seg-package-sol, echo=FALSE}
+#install.packages("seg")
+library(seg)
+
+# data needs to be in a numeric matrix
+library(tidyverse)
+library(sf)
+unique(inscriptions$form_dis_manibus_cons)
+unique(inscriptions$form_dis_manibus)
+
+unique(inscriptions$form_dis_manibus_ins)
+
+i_data <- inscriptions %>% 
+  dplyr::mutate(dismanibus = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 1,
+    form_dis_manibus == "diis manibus" ~ 1,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0
+    ),
+    dismanibussacrum = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 1,
+    form_dis_manibus == "diis manibus sacrum" ~ 1 ),
+    dimanes = case_when(
+    form_dis_manibus == "di manes" ~ 1,
+     form_dis_manibus == "dii manes" ~ 1,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0)) %>% 
+  dplyr::select(dismanibus, dismanibussacrum, dimanes) %>% st_drop_geometry()
+
+# run the spseg() function
+pp <- seg::spseg(x = st_coordinates(inscriptions), data=i_data, smoothing = "kernel", maxdist = 6000)
+
+# Look at the results
+print(pp, digits = 3)
+spplot(pp, main = "Kernel")
+help(spseg)
+# To interpret the numbers check out Reardon and O'Sullivan's article
+# https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.0081-1750.2004.00150.x
+
+
+detach("package:seg")
+
+```
+D is a measure of how different the composition of individual's local environments are , on  average, from the composition of the population as a whole. 
+R is a measure of how much less diverse individuals' local environments are, on average, than is the total population of region R. It is based on spatially-weighted interaction index of population diversity (near locations contribute more than distant locations - distance-decay approach).
+H is an aspatial measure of how much less diverse individuals' local environments are, on average, than is the total population of region R (entropy of local and overall envrionemt). 1 indicates maximum segregation, - when each indvidiuals' local environment is monoracial, for example. 0 indicates complete integration, when each individual's local environment has the same racial composition as the total population.
+
+P spatial exposure of one group to another in local environment. Spatial isolation is the spatial exposure of group to itself
+
+# Task 8: Start working with time
+
+```{r load-centuries}
+# Download json for 1st c CE
+
+library(jsonlite)
+# First century
+download.file("https://sciencedata.dk/public/b6b6afdb969d378b70929e86e58ad975/formulae/EDH_DM_1CAD.json", "../data/EDH_DM1.json")
+list_json <- jsonlite::fromJSON("../data/EDH_DM1.json")
+CenturyOne <-  as_tibble(list_json)
+
+# Second century
+download.file("https://sciencedata.dk/public/b6b6afdb969d378b70929e86e58ad975/formulae/EDH_DM_2CAD.json", "../data/EDH_DM2.json")
+list_json <- jsonlite::fromJSON("../data/EDH_DM2.json")
+CenturyTwo <-  as_tibble(list_json)
+
+# Third century
+download.file("https://sciencedata.dk/public/b6b6afdb969d378b70929e86e58ad975/formulae/EDH_DM_3CAD.json", "../data/EDH_DM3.json")
+list_json <- jsonlite::fromJSON("../data/EDH_DM3.json")
+CenturyThree <-  as_tibble(list_json)
+
+
+# Inspect
+names(CenturyOne)
+CenturyOne$random_dates
+CenturyOne$date_var_1  # first list of random generated dates from use span interval
+
+# Spatialize
+i1 <- inscriptions %>% 
+  filter(id%in%CenturyOne$id) # 7 fewer than in CenturyOne
+
+i2 <- inscriptions %>% 
+  filter(id%in%CenturyTwo$id) # over 200 ids fewer
+length(which(duplicated(CenturyTwo$id)))
+
+i3 <- inscriptions %>% 
+  filter(id%in%CenturyThree$id) # 2000 missing
+
+
+# Alternative spatialisation
+i1 <- CenturyOne %>% filter(!is.na(latitude)) %>%  
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_transform(3035)
+
+i2 <- CenturyTwo %>% filter(!is.na(latitude)) %>%  
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_transform(3035)
+
+i3 <- CenturyThree %>% filter(!is.na(latitude)) %>%  
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_transform(3035)
+
+plot(i1$geometry, col = "red")
+plot(i2$geometry, col = "green", add =T)
+plot(i3$geometry, col = "yellow", add =T) 
+plot(RE, add= T)
+```
+
+# Task 9: DM segregation results in century-slices
+My expectation is for higher values of segregation-isolation as aggregation will increase diversity.
+
+## First century
+```{r seg-1AD}
+i1_data <- i1 %>% 
+  dplyr::mutate(dismanibus = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 1,
+    form_dis_manibus == "diis manibus" ~ 1,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0
+    ),
+    dismanibussacrum = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 1,
+    form_dis_manibus == "diis manibus sacrum" ~ 1 ),
+    dimanes = case_when(
+    form_dis_manibus == "di manes" ~ 1,
+     form_dis_manibus == "dii manes" ~ 1,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0)) %>% 
+  dplyr::select(dismanibus, dismanibussacrum, dimanes) %>% st_drop_geometry()
+
+# run the spseg() function
+pp1 <- seg::spseg(x = st_coordinates(i1), data=i1_data, smoothing = "kernel", maxdist = 6000)
+
+# Look at the results
+print(pp1, digits = 3)
+spplot(pp1, main = "Kernel")
+help(spseg)
+```
+## Second century
+```{r seg-2AD}
+i2_data <- i2 %>% 
+  dplyr::mutate(dismanibus = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 1,
+    form_dis_manibus == "diis manibus" ~ 1,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0
+    ),
+    dismanibussacrum = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 1,
+    form_dis_manibus == "diis manibus sacrum" ~ 1 ),
+    dimanes = case_when(
+    form_dis_manibus == "di manes" ~ 1,
+     form_dis_manibus == "dii manes" ~ 1,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0)) %>% 
+  dplyr::select(dismanibus, dismanibussacrum, dimanes) %>% st_drop_geometry()
+
+# run the spseg() function
+pp2 <- seg::spseg(x = st_coordinates(i2), data=i2_data, smoothing = "kernel", maxdist = 6000)
+
+# Look at the results
+print(pp2, digits = 3)
+spplot(pp2, main = "Kernel")
+help(spseg)
+```
+
+## Third century
+
+```{r seg-3AD}
+i3_data <- i3 %>% 
+  dplyr::mutate(dismanibus = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 1,
+    form_dis_manibus == "diis manibus" ~ 1,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0
+    ),
+    dismanibussacrum = case_when(
+    form_dis_manibus == "di manes" ~ 0,
+     form_dis_manibus == "dii manes" ~ 0,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 1,
+    form_dis_manibus == "diis manibus sacrum" ~ 1 ),
+    dimanes = case_when(
+    form_dis_manibus == "di manes" ~ 1,
+     form_dis_manibus == "dii manes" ~ 1,
+     form_dis_manibus == "dis manibus" ~ 0,
+    form_dis_manibus == "diis manibus" ~ 0,
+    form_dis_manibus == "dis manibus sacrum" ~ 0,
+    form_dis_manibus == "diis manibus sacrum" ~ 0)) %>% 
+  dplyr::select(dismanibus, dismanibussacrum, dimanes) %>% st_drop_geometry()
+
+# run the spseg() function
+pp3 <- seg::spseg(x = st_coordinates(i3), data=i3_data, smoothing = "kernel", maxdist = 6000)
+
+# Look at the results
+print(pp3, digits = 3)
+spplot(pp3, main = "Kernel")
+help(spseg)
+```
+
+
+# Task 10: Space-time modeeling with splancs?
+Grab a random date for each inscription `i1$date_var_1` and use it to simulate a date
+Aggrgate i1 - i3 and run space-tiem on it.
+
+```{r}
+i1$date_var_1
+```
+
