@@ -47,54 +47,7 @@ RE <- st_union(provinces) %>% st_transform(3035)
 plot(RE)
 ```
 
-# Task 2: Load ancient cities and convert to sf object
-John Hanson has created a dataset of all cities in the ancient Mediterranean and made it available online. You will download this dataset and convert it into an sf object in order to compare with the inscriptions on the basis of location.  
-
-* Use `read_csv()` to load `Hanson2016_Cities_OxREP.csv` dataset from the provided URL and assign it to `cities` object
-
-```{r load-cities, eval=FALSE}
-cities <- as.data.frame(read_csv("http://oxrep.classics.ox.ac.uk/oxrep/docs/Hanson2016/________________"))
-```
-
-... then reproject this data to EPSG 3035
-```{r prj-cities, eval=FALSE}
-# Convert the table into an sf object on the basis of X and Y columns
-cities_sf <- ________(cities, coords = c("Longitude (X)", "Latitude (Y)"))
-
-# Define the projection of Lat/Long coordinates as EPSG 4326
-cities_sf4326<- st_set_crs(cities_sf, ________)
-
-# Transform the projection to a 2D projection using EPSG 3035
-cities_sf3035<- st_transform(cities_sf4326, ___________)
-
-# Verify the projection is 'projected' not 'geographic'
-______(cities_sf3035)
-```
-
-
-### Question: 
-*1. What are the measurement units of the `cities_sf3035` object?*
-
-
-# Task 3: Create a buffer around each city and inspect the result
-
-As each city and inscription corresponds to a dot on the map, the best way to grab and review the inscriptions will be by creating a buffer around each city and then selecting the inscriptions that fall into the buffer as belonging to the city. 
-
-* Create a buffer around the `cities_sf3035` geometry with `st_buffer()` , setting the `dist` argument to the desired radius of 5000m.
-* Plot the first ten buffers and the first ten cities on top for a quick review. Can you tell that the buffers are really 5000m?
-
-```{r buff, eval=FALSE}
-# Make buffer of 5 km. Check the units of your object to correctly assign value to dist
-cities_5km<- st_buffer(_____,dist = _________)
-
-# Plot the first 10 buffers and cities to check result 
-plot(___________(___________)[1:10], col = "yellow")
-plot(___________(___________)[1:10], pch=20, cex = 0.1, add = TRUE)
-
-```
-
-
-# Task 4: Load DM inscriptions
+# Task 2: Load DM inscriptions
 
 ```{r DM-Roman Empire}
 # Load DM data for Spain
@@ -202,7 +155,7 @@ plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")
 print(bw_choice$hcv)  # 6000m
 ```
 
-# Task 5: DM formula proportion estimation
+# Task 3: DM formula proportion estimation
 
 ```{r optimum-bandwith-sol, echo=FALSE, }
 
@@ -232,7 +185,7 @@ plotmc(seg10, "dii manes")
 Good work! The simulation shows that dms is relatively more frequent in the south of Spain, while dis manibus has a higher proportion in the north.
 
 
-# Task 6: DM Segregation- Mapping segregation
+# Task 4: DM Segregation- Mapping segregation
 
 With a base map and some image and contour functions we can display both the probabilities and the significance tests over the area with more control than the `plotmc()` function.
 
@@ -328,7 +281,7 @@ segmap(prob_dismanibuss, p_value, 0.11, 0.15)
 ```
 
 
-# Task 7: Dissimilarity index
+# Task 5: Dissimilarity index
 
 ```{r seg-package-sol, echo=FALSE}
 #install.packages("seg")
@@ -387,7 +340,7 @@ H is an aspatial measure of how much less diverse individuals' local environment
 
 P spatial exposure of one group to another in local environment. Spatial isolation is the spatial exposure of group to itself
 
-# Task 8: Start working with time
+# Task 6: Start working with time
 
 ```{r load-centuries}
 # Download json for 1st c CE
@@ -445,7 +398,7 @@ plot(i3$geometry, col = "yellow", add =T)
 plot(RE, add= T)
 ```
 
-# Task 9: DM segregation results in century-slices
+# Task 7: DM segregation results in century-slices
 My expectation is for higher values of segregation-isolation as aggregation will increase diversity.
 
 ## First century
@@ -557,11 +510,141 @@ help(spseg)
 ```
 
 
-# Task 10: Space-time modeeling with splancs?
+# Task 8: Space-time modelling with splancs?
 Grab a random date for each inscription `i1$date_var_1` and use it to simulate a date
 Aggrgate i1 - i3 and run space-tiem on it.
 
-```{r}
-i1$date_var_1
+To do a space-time clustering test with `stmctest()` from the `splancs` package, you first need to convert parts of your `ppp` object. Functions in `splancs` tend to use matrix data instead of data frames.
+
+To run `stmctest()` you need to set up the following:
+
+- event locations
+- event times
+- region polygon
+- time limits
+- the time and space ranges for analysis.
+
+
+```{r cluster-sol, echo=FALSE}
+#Libraries
+library(spatstat)
+library(splancs)
+
+# Data
+i <- rbind(i1, i2, i3)
+
+# Get a matrix of event coordinates
+i_xy <- as.matrix(st_coordinates(i))
+
+# Check the matrix has two columns
+dim(i_xy)
+
+# Get a vector of event times
+names(i)
+i_t <- i$date_var_1
+
+# Extract a two-column matrix from the ppp object
+i_poly <- as.matrix(as.data.frame(window))
+dim(i_poly)
+
+# Set the time limit to 1 day before and 1 day after the range of times
+tlimits <- range(i_t) + c(-1, 1)
+
+# Scan over 6000m intervals from 1000m to 20000km
+s <- seq(1000, 20000, by = 6000)
+
+# Scan over 14 day intervals from one week to 31 weeks
+tm <- seq(1,400, by = 7)
+
 ```
+
+Gosh, what a lot of set-up! Now for the action.
+## Monte Carlo test 
+
+Everything is now ready for you to run the space-time clustering test function. You can then plot the results and compute a `p-value` for rejecting the null hypothesis of no space-time clustering.
+
+Any space-time clustering in a data set will be removed if you randomly rearrange the dates of the data points. The `stmctest()` function computes a clustering test statistic for your data based on the space-time K-function - how many points are within a spatial and temporal window of a point of the data. It then does a number of random rearrangements of the dates among the points and computes the clustering statistic. After doing this a large number of times, you can compare the test statistic for your data with the values from the random data. If the test statistic for your data is sufficiently large or small, you can reject the null hypothesis of no space-time clustering.
+
+The output from `stmctest(`) is a list with a single `t0` which is the test statistic for your data, and a vector of `t` from the simulations. By converting to data frame you can feed this to `ggplot` functions.
+
+Because the window area is a large number of square meters, and we have about 400 events, the numerical value of the intensity is a very small number. This makes values of the various K-functions very large numbers, since they are proportional to the inverse of the intensity. Don't worry if you see 10^10 or higher!
+
+The `p-value` of a Monte-Carlo test like this is just the proportion of test statistics that are larger than the value from the data. You can compute this from the `t` and `t0` elements of the output.
+
+## Instructions
+
+* Ensure that all the objects from the previous exercise are loaded.
+* Run `stmctest()` for 999 simulations.
+* Draw a histogram of times.
+* The x-aesthetic is `t`.
+* Add a vertical line at the `t0` value.
+* Sum up how many `t` values are larger than the `t0` value, and compute as a proportion. 
+
+```{r MC-sol, echo=FALSE}
+# Run 999 simulations 
+i_mc <- stmctest(i_xy, i_t, i_poly, tlimits, s, tm, nsim = 99, quiet = TRUE)
+names(i_mc)
+
+# Histogram the simulated statistics and add a line at the data value
+library(ggplot2)
+ggplot(data.frame(i_mc), aes(x = t)) + 
+  geom_histogram() + 
+  geom_vline(aes(xintercept = t0))
+
+# Compute the p-value as the proportion of tests greater than the data
+sum(i_mc$t > i_mc$t0) / 1000
+```
+p = 0.099
+Magnificent Monte Carlo simulation!
+
+# Task 9: Space-time over DM formulae -- UNFINISHED, maybe meaningless?
+Let's use the split-up i and model different formulae in space and time
+
+```{r cluster-sol, echo=FALSE}
+#Libraries
+library(spatstat)
+library(splancs)
+
+# Data
+i <- rbind(i1, i2, i3)
+i <- cbind(i, century = c(rep(1,428), rep(2, 4959), rep(3,3137)))
+# Get a matrix of event coordinates
+i_xy <- as.matrix(st_coordinates(i %>% 
+                                    filter(form_dis_manibus=="dis manibus")))
+
+# Check the matrix has two columns
+dim(i1_xy)
+
+# Get a vector of event times
+names(i1)
+i1_t <- i1$date_var_1
+
+# Extract a two-column matrix from the ppp object
+i_poly <- as.matrix(as.data.frame(window))
+dim(i_poly)
+
+# Set the time limit to 1 day before and 1 day after the range of times
+tlimits <- range(i_t) + c(-1, 1)
+
+# Scan over 6000m intervals from 1000m to 20000km
+s <- seq(1000, 20000, by = 6000)
+
+# Scan over 14 day intervals from one week to 31 weeks
+tm <- seq(1,400, by = 7)
+
+```
+
+# Task 10: Spatial clustering
+
+```{r K-cross-sol}
+kc <- Kcross(i_ppp, i = "dis manibus", j = "dis manibus sacrum")
+plot(kc, . - pi * r ^ 2 ~ r)
+
+#ekc <- envelope(i_ppp, Kcross, nsim = 50, i = "dis manibus", j = "dis manibus sacrum")
+ekc <- readRDS("../data/DMekc.rds")
+plot(ekc, . - pi * r ^ 2 ~ r)
+
+saveRDS(ekc, "../data/DMekc.rds")
+```
+
 
