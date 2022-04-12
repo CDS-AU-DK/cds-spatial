@@ -7,7 +7,7 @@ token <- "pk.eyJ1IjoiYWRpdmVhIiwiYSI6ImNrcWdhNGlybjB4OG0ydnNjcWZtOG9mc3UifQ.EbNm
 # Read in the shelter data
 shelter <- readr::read_rds("../data/shelters.rds") 
 
-st_crs(shelters) <- 4326
+st_crs(shelter) <- 4326
 
 # Set up a sidebar panel with a text box for an input address, 
 # and a placeholder to print out the driving instructions
@@ -16,7 +16,8 @@ ui <- fluidPage(
     textInput("address_text", label = "Address",
               placeholder = "Type an address or place name"),
     actionButton("action", "Find the nearest shelter"),
-    htmlOutput("instructions", label = "Instructions to the shelter /n (beware:location error ~100m)"),
+    textInput("instructions_text", label = "Instructions to the shelter /n (beware:location error ~100m)"),
+    htmlOutput("instructions"),
     width = 3
   ),
   mainPanel(

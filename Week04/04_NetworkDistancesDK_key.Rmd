@@ -432,6 +432,7 @@ leaflet() %>%
 ```
 
 
+### Accessibility of Midtjylland hospitals
 Let's convert the tibble to an sf POINT object. This dataset can be used to analyze which areas are immediately covered by hospital services, and which are not. We’ll measure accessibility using isochrones as above, and consider a 20 minute walk-time, cycling- and driving-time around each hospital. `mb_isochrone()` can accept sf objects as input, and will retain an ID from the input sf object if the column name is specified.
 
 ```{r isochrones-h, eval = FALSE}
@@ -466,15 +467,12 @@ driving_isos <- mb_isochrone(
 )
 ```
 
-### Accessibility of Midtjylland hospitals
+### Plot the accessibility of Midtjylland hospitals
 These results can be visualized on our Mapbox map:
 
 ```{r map-isos, eval = FALSE}
 mapbox_map %>%
-  addPolygons(data = walking_isos,
-              popup = ~id) %>% 
-  addPolygons(data=cycling_isos, color = "red") %>% 
-   addPolygons(data=driving_isos, color = "yellow")
+  ___________
 
 ```
 

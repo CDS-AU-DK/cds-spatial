@@ -69,3 +69,60 @@ mapview(shelters)
 saveRDS(shelters, "../data/shelters.rds")
 ```
 
+# Map Accessibility
+
+We’ll first generate the isochrones using a vector of times, 1 through 20 at 1-minute intervals, around the available shelters address.
+
+```{r isochrones-Skejby, eval =FALSE}
+library(mapboxapi)
+
+walking_isos <- mb_isochrone(
+  location = shelters,
+  profile = "walking",
+  time = 1:20
+)
+
+saveRDS(walking_isos, "../data/shelterswalkisos4326.shp")
+```
+Next, we can visualize our overlapping isochrones. We’ll use the `viridis` color palette as we did previously in the tutorial, and generate a color palette derived from the `time` column in our dataset. Once specified, we can add these polygons to our Mapbox basemap with a mostly-transparent fill opacity.
+
+```{r load-isos, echo=FALSE}
+# isos <- read_sf("../data/shelterswalkisos4326.shp")lking_isos <- read_sf("../data/shelterswalkisos4326.shp")
+```
+
+Let's see what the shelter coverage is if we tolerate a walking time of 0 - 5 mins to cover.
+
+```{r map-shelter-multipleisochrones}
+#library(tidyverse)
+pal <- colorNumeric("viridis", walking_isos$time[16:20], na.color = "transparent")
+
+FiveMinCover <- mapbox_map %>%
+  addPolygons(data = walking_isos %>% filter(time<6),
+              fillColor = ~pal(time),
+              stroke = FALSE,
+              fillOpacity = 0.1) %>%
+  addLegend(values = walking_isos$time[16:20],
+            pal = pal,
+            title = "Walk-time to Aarhus shelters")
+
+FiveMinCover
+
+```
+
+
+Save the result if you wish to
+
+```{r save, eval = FALSE}
+library(htmlwidgets)
+saveWidget(FiveMinCover, "Shelter5min.html", selfcontained = TRUE)
+```
+
+The result illustrates some of the wide differences in accessibility between various parts of the town.
+
+```{r simple-walking-isos}
+mapbox_map %>%
+  addPolygons(data = walking_isos %>% filter(time==2),
+              color = "red",
+              fillOpacity = 0.1) 
+```
+
