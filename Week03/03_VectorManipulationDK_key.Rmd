@@ -92,11 +92,15 @@ df <- data.frame(place = c("Aarhus Domkirke",
                  longitude=c(10.2102364,10.1949197,10.2033485),
                  latitude=c(56.1574919,56.1772228,56.174346))
 
-# Review df
-df
-
 # Convert the data frame to an sf object             
 df_sf <- st_as_sf(df, coords = c("longitude", "latitude"), crs =4326)
+
+# Buffer unprojected points
+?st_buffer()
+df_test <- st_buffer(df_sf, dist = c(500, 1000, 1500))
+library(mapview)
+mapview(df_test)
+
 
 # Transform the points to match the shelters' CRS EPSG 25832
 df_crs <- st_transform(df_sf, crs = 25832)

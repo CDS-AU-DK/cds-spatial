@@ -41,7 +41,7 @@ provinces <- st_read("https://raw.githubusercontent.com/pelagios/magis-pleiades-
 plot(provinces$geometry)
 unique(provinces$name) %>% sort()
 Spain <- provinces %>% filter(name %in% c("Lusitania", "Baetica", "Hispaniae")) %>% st_transform(3035)
-plot(Spain$geometry); plot(inscriptions$geometry, add =T)
+plot(Spain$geometry)
 
 RE <- st_union(provinces) %>% st_transform(3035)
 plot(RE)
@@ -49,19 +49,15 @@ plot(RE)
 
 # Task 2: Load DM inscriptions
 
-```{r DM-Roman Empire}
+## Load DM inscriptions from the entire Empire
+We could load the formulas for the entire Empire, but they are a bit unwieldy for the purpose of segregation, so let us instead start with the inscriptions in Spain.
+```{r DM-Roman Empire, echo=FALSE}
 # Load DM data for Spain
 library(jsonlite)
-
-# massive 225Mb datset - disrecommended
-#list_json <- jsonlite::fromJSON("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_dis_manibus_2021-08-12.json")
 
 # small 40kb new dataset from March 2022
 list_json <- jsonlite::fromJSON("C:/Users/au616760/Documents/RStudio/SDAM/EDH_exploration/data/EDH_DM.json")
 
-
-# small temporal slices
-list_json <- jsonlite::fromJSON("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_dis_manibus_2021-08-12.json")
 inscriptions = as_tibble(list_json)
 
 # Check the first couple lines and column names
@@ -85,44 +81,45 @@ plot(inscriptions$geometry); plot(RE, add =T)
 ```
 
 ## Get Spain for test
-```{r Spain, eval = FALSE}
+```{r Spain}
 # Get just Spain
 library(tidyverse)
 
 # On Home Dell
 # inscriptions <- read_csv("C:/Users/Adela/Documents/RStudio/sdam/EDH_exploration/data/EDH_DM_Spain.csv")
 # on Office Dell
-inscriptions <- read_csv("C:/Users/au616760/Documents/RStudio/SDAM/EDH_exploration/data/EDH_DM_Spain.csv")
-head(inscriptions)
-names(inscriptions)
+inscription_spain <- read_csv("C:/Users/au616760/Documents/RStudio/SDAM/EDH_exploration/data/EDH_DM_Spain.csv")
+head(inscription_spain)
+names(inscription_spain)
 
 # Make a simple feature
 library(sf)
-inscriptions <- inscriptions %>% 
+inscription_spain <- inscription_spain %>% 
   filter(!is.na(longitude)) %>% 
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
   st_transform(3035)
 
-ch <- st_buffer(st_convex_hull(st_union(inscriptions)),100)
-b <- st_make_grid(inscriptions, n=1)
-plot(inscriptions$geometry); plot(b, add=T); plot(ch, border = "green", add=T)
+ch <- st_buffer(st_convex_hull(st_union(inscription_spain)),100)
+b <- st_make_grid(inscription_spain, n=1)
+plot(inscription_spain$geometry); plot(b, add=T); plot(ch, border = "green", add=T)
 ```
 
-
-Convert data into a ppp object
-```{r}
+# Start Spatial Segregation
+Before attempting any spatial analysis, we need to convert data for Spain into a ppp object
+```{r create-Spain-ppp}
 # Libraries
 library(spatstat)
 library(spatialkernel)
 
 # Data
-pts <- as.matrix(st_coordinates(inscriptions))
-marks <- inscriptions[["form_dis_manibus"]]
+pts <- as.matrix(st_coordinates(inscription_spain))
+marks <- inscription_spain[["form_dis_manibus"]]
 
 # Window
 REbuff <- st_buffer(RE, 500)
-plot(REbuff); plot(ch, add =T)
-w <- as.owin(as_Spatial(st_sf(ch)))
+plot(REbuff); plot(ch, col = "red", add =T)
+# w <- as.owin(as_Spatial(st_sf(ch))) # does not work on school Dell, try the line below
+w <- as.owin(st_sf(ch)) # does work
 
 # density
 library(maptools)
@@ -132,15 +129,16 @@ plot(i_ppp)
 plot(density(i_ppp))
 
 ```
-## Basic density
-```{r}
+## Basic density of Spanish formulae split by type
+Here we create an `spp`, a split marked spatial pattern. The spatstat library will now read the type of formula column as a factor and group by it for the purpose of all visualisations and computations. 
+```{r split-Spain-ppp}
 i_spp <- split(i_ppp)
 plot(density(i_spp))
 ```
 
 
-## Look for optimal bandwidth
-```{r}
+## Look for optimal bandwidth for a kernel
+```{r Spain-bandwidth}
 # Scan from 1000m to 10000m in steps of 1000m
 ?spseg()
 
@@ -149,15 +147,16 @@ bw_choice <- spatialkernel::spseg(pts, marks,
     opt = 1)
 
 # Plot the results and highlight the best bandwidth
-plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")
+#plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red") # it does not want to plot
 
 # Print the best bandwidth
 print(bw_choice$hcv)  # 6000m
 ```
+While the `plotcv()` will not plot the range of bandwiths and their impact on the segregation, the best choice `hcv` is 6000m in the case of Spanish inscriptions with formulae.
 
-# Task 3: DM formula proportion estimation
+# Task 3: DM formula proportion estimation in a given environment
 
-```{r optimum-bandwith-sol, echo=FALSE, }
+```{r simulate-DM-neighborhood, echo=FALSE, }
 
 # Set the correct bandwidth and run for 10 simulations only
 seg10 <- spatialkernel::spseg(
@@ -169,20 +168,22 @@ seg10 <- spatialkernel::spseg(
     proc = FALSE,
     poly = as.matrix(st_coordinates(ch)[,1:2]))
 
-seg10 <- readRDS("../data/DMseg10.rds")
+# If you are rerunning, you can reload the saved object
+#seg10 <- readRDS("../data/DMseg10.rds")
 
 # Plot the segregation map for different DIS MANIBUS formulae
 unique(marks)
 plotmc(seg10, "dis manibus")
 plotmc(seg10, "dis manibus sacrum")
-plotmc(seg10, "dii manes")
+plotmc(seg10, "d m s")
+plotmc(seg10, "d m")
 
 
 # save the seg10 object
-#saveRDS(seg10, "../data/DMREseg10.rds")
+# saveRDS(seg10, "../data/DMseg10.rds")
 ```
 
-Good work! The simulation shows that dms is relatively more frequent in the south of Spain, while dis manibus has a higher proportion in the north.
+Good work! The simulation shows that long version of dis manibus sacrus is relatively more frequent in the south of Spain, while dis manibus has a higher proportion in the north.
 
 
 # Task 4: DM Segregation- Mapping segregation
@@ -282,7 +283,7 @@ segmap(prob_dismanibuss, p_value, 0.11, 0.15)
 
 
 # Task 5: Dissimilarity index
-
+This exercise is taking the inscriptions from the entire Roman Empire, which you can reload by running the Step 2: Loading RM inscriptions, and exploring the similarity of the different 'communities' of formulae detected via a kernel of 
 ```{r seg-package-sol, echo=FALSE}
 #install.packages("seg")
 library(seg)
@@ -336,11 +337,34 @@ detach("package:seg")
 ```
 D is a measure of how different the composition of individual's local environments are , on  average, from the composition of the population as a whole. 
 R is a measure of how much less diverse individuals' local environments are, on average, than is the total population of region R. It is based on spatially-weighted interaction index of population diversity (near locations contribute more than distant locations - distance-decay approach).
-H is an aspatial measure of how much less diverse individuals' local environments are, on average, than is the total population of region R (entropy of local and overall envrionemt). 1 indicates maximum segregation, - when each indvidiuals' local environment is monoracial, for example. 0 indicates complete integration, when each individual's local environment has the same racial composition as the total population.
+H is an aspatial measure of how much less diverse individuals' local environments are, on average, than is the total population of region R (entropy of local and overall environment). 1 indicates maximum segregation, - when each indviduals' local environment is monoracial, for example. 0 indicates complete integration, when each individual's local environment has the same racial composition as the total population.
 
 P spatial exposure of one group to another in local environment. Spatial isolation is the spatial exposure of group to itself
 
-# Task 6: Start working with time
+# Task 6: Spatial clustering
+
+```{r K-cross}
+kc <- Kcross(i_ppp, i = "dis manibus", j = "dis manibus sacrum")
+plot(kc)
+plot(kc, . - pi * r ^ 2 ~ r)
+
+```
+
+This chart shows that the dis manibus and dis manibus sacrum formulae are clustered at short distances up to 50km and then dispersed, unless we consider border effects (green dotted line)
+
+```{r K-cross-env}
+#ekc <- envelope(i_ppp, Kcross, nsim = 50, i = "dis manibus", j = "dis manibus sacrum")
+ekc <- readRDS("../data/DMekc.rds")
+plot(ekc)
+plot(ekc, . - pi * r ^ 2 ~ r)
+
+saveRDS(ekc, "../data/DMekc.rds")
+
+```
+If we calculate an envelope of confidence, all the DM and DMS formulae are mutually clustered compared to the random distribution that one would anticipate. However at the scale of 200-600km this is not super-helpful. We need smaller more regional datasets. 
+
+# Task 7: Start working with time
+Let's break up the RE inscriptions by century
 
 ```{r load-centuries}
 # Download json for 1st c CE
@@ -364,7 +388,7 @@ CenturyThree <-  as_tibble(list_json)
 
 # Inspect
 names(CenturyOne)
-CenturyOne$random_dates
+#CenturyOne$random_dates
 CenturyOne$date_var_1  # first list of random generated dates from use span interval
 
 # Spatialize
@@ -398,7 +422,7 @@ plot(i3$geometry, col = "yellow", add =T)
 plot(RE, add= T)
 ```
 
-# Task 7: DM segregation results in century-slices
+# Task 8: DM segregation results in century-slices
 My expectation is for higher values of segregation-isolation as aggregation will increase diversity.
 
 ## First century
@@ -506,145 +530,4 @@ pp3 <- seg::spseg(x = st_coordinates(i3), data=i3_data, smoothing = "kernel", ma
 # Look at the results
 print(pp3, digits = 3)
 spplot(pp3, main = "Kernel")
-help(spseg)
 ```
-
-
-# Task 8: Space-time modelling with splancs?
-Grab a random date for each inscription `i1$date_var_1` and use it to simulate a date
-Aggrgate i1 - i3 and run space-tiem on it.
-
-To do a space-time clustering test with `stmctest()` from the `splancs` package, you first need to convert parts of your `ppp` object. Functions in `splancs` tend to use matrix data instead of data frames.
-
-To run `stmctest()` you need to set up the following:
-
-- event locations
-- event times
-- region polygon
-- time limits
-- the time and space ranges for analysis.
-
-
-```{r cluster-sol, echo=FALSE}
-#Libraries
-library(spatstat)
-library(splancs)
-
-# Data
-i <- rbind(i1, i2, i3)
-
-# Get a matrix of event coordinates
-i_xy <- as.matrix(st_coordinates(i))
-
-# Check the matrix has two columns
-dim(i_xy)
-
-# Get a vector of event times
-names(i)
-i_t <- i$date_var_1
-
-# Extract a two-column matrix from the ppp object
-i_poly <- as.matrix(as.data.frame(window))
-dim(i_poly)
-
-# Set the time limit to 1 day before and 1 day after the range of times
-tlimits <- range(i_t) + c(-1, 1)
-
-# Scan over 6000m intervals from 1000m to 20000km
-s <- seq(1000, 20000, by = 6000)
-
-# Scan over 14 day intervals from one week to 31 weeks
-tm <- seq(1,400, by = 7)
-
-```
-
-Gosh, what a lot of set-up! Now for the action.
-## Monte Carlo test 
-
-Everything is now ready for you to run the space-time clustering test function. You can then plot the results and compute a `p-value` for rejecting the null hypothesis of no space-time clustering.
-
-Any space-time clustering in a data set will be removed if you randomly rearrange the dates of the data points. The `stmctest()` function computes a clustering test statistic for your data based on the space-time K-function - how many points are within a spatial and temporal window of a point of the data. It then does a number of random rearrangements of the dates among the points and computes the clustering statistic. After doing this a large number of times, you can compare the test statistic for your data with the values from the random data. If the test statistic for your data is sufficiently large or small, you can reject the null hypothesis of no space-time clustering.
-
-The output from `stmctest(`) is a list with a single `t0` which is the test statistic for your data, and a vector of `t` from the simulations. By converting to data frame you can feed this to `ggplot` functions.
-
-Because the window area is a large number of square meters, and we have about 400 events, the numerical value of the intensity is a very small number. This makes values of the various K-functions very large numbers, since they are proportional to the inverse of the intensity. Don't worry if you see 10^10 or higher!
-
-The `p-value` of a Monte-Carlo test like this is just the proportion of test statistics that are larger than the value from the data. You can compute this from the `t` and `t0` elements of the output.
-
-## Instructions
-
-* Ensure that all the objects from the previous exercise are loaded.
-* Run `stmctest()` for 999 simulations.
-* Draw a histogram of times.
-* The x-aesthetic is `t`.
-* Add a vertical line at the `t0` value.
-* Sum up how many `t` values are larger than the `t0` value, and compute as a proportion. 
-
-```{r MC-sol, echo=FALSE}
-# Run 999 simulations 
-i_mc <- stmctest(i_xy, i_t, i_poly, tlimits, s, tm, nsim = 99, quiet = TRUE)
-names(i_mc)
-
-# Histogram the simulated statistics and add a line at the data value
-library(ggplot2)
-ggplot(data.frame(i_mc), aes(x = t)) + 
-  geom_histogram() + 
-  geom_vline(aes(xintercept = t0))
-
-# Compute the p-value as the proportion of tests greater than the data
-sum(i_mc$t > i_mc$t0) / 1000
-```
-p = 0.099
-Magnificent Monte Carlo simulation!
-
-# Task 9: Space-time over DM formulae -- UNFINISHED, maybe meaningless?
-Let's use the split-up i and model different formulae in space and time
-
-```{r cluster-sol, echo=FALSE}
-#Libraries
-library(spatstat)
-library(splancs)
-
-# Data
-i <- rbind(i1, i2, i3)
-i <- cbind(i, century = c(rep(1,428), rep(2, 4959), rep(3,3137)))
-# Get a matrix of event coordinates
-i_xy <- as.matrix(st_coordinates(i %>% 
-                                    filter(form_dis_manibus=="dis manibus")))
-
-# Check the matrix has two columns
-dim(i1_xy)
-
-# Get a vector of event times
-names(i1)
-i1_t <- i1$date_var_1
-
-# Extract a two-column matrix from the ppp object
-i_poly <- as.matrix(as.data.frame(window))
-dim(i_poly)
-
-# Set the time limit to 1 day before and 1 day after the range of times
-tlimits <- range(i_t) + c(-1, 1)
-
-# Scan over 6000m intervals from 1000m to 20000km
-s <- seq(1000, 20000, by = 6000)
-
-# Scan over 14 day intervals from one week to 31 weeks
-tm <- seq(1,400, by = 7)
-
-```
-
-# Task 10: Spatial clustering
-
-```{r K-cross-sol}
-kc <- Kcross(i_ppp, i = "dis manibus", j = "dis manibus sacrum")
-plot(kc, . - pi * r ^ 2 ~ r)
-
-#ekc <- envelope(i_ppp, Kcross, nsim = 50, i = "dis manibus", j = "dis manibus sacrum")
-ekc <- readRDS("../data/DMekc.rds")
-plot(ekc, . - pi * r ^ 2 ~ r)
-
-saveRDS(ekc, "../data/DMekc.rds")
-```
-
-
