@@ -1,0 +1,232 @@
+---
+title: "Exploring Leaflet"
+author: "Adela Sobotkova"
+date: "2022-12-19"
+output: 
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Leaflet is one of the most popular libraries for web visualisation of spatial data. It was created 11 years ago by a Ukrainian citizen living in Kyiv. [Leaflet](https://leafletjs.com/) is an open-source JavaScript library for interactive maps. It’s used by websites ranging from The New York Times and The Washington Post to GitHub and Flickr, as well as GIS specialists like OpenStreetMap, Mapbox, and CartoDB. The R package makes it easy to control Leaflet maps in R
+
+
+## What can you do with Leaflet?
+
+You can:
+
+* Create maps right from the R console or RStudio
+* Embed maps in knitr/R Markdown documents and Shiny apps
+* Easily render spatial objects from the `sp` or `sf` packages, or data frames with `latitude`/`longitude` columns
+* Utilize features such as: Interactive panning/zooming
+* Compose maps using arbitrary combinations of:
+  - Map tiles
+  - Markers
+  - Polygons
+  - Lines
+  - Popups
+  - GeoJSON
+* Use map bounds and mouse events to drive Shiny logic
+* Display maps in non spherical mercator projections
+* Augment map features using chosen plugins from leaflet plugins repository
+
+## Installation
+```{r install}
+#install.packages("leaflet")
+# to install the development version from Github, run
+# devtools::install_github("rstudio/leaflet")
+```
+
+## Basic Usage
+You create a Leaflet map with these basic steps:
+
+* Create a map widget by calling `leaflet()`.
+* Add *layers* (i.e., features) to the map by using layer functions (e.g. `addTiles`, `addMarkers`, `addPolygons`) to modify the map widget.
+* Repeat step 2 as desired.
+* Print the map widget to display it.
+
+Here is a basic example
+```{r example-1}
+library(leaflet)
+library(tidyverse)
+
+m <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(lng=174.768, lat=-36.852, popup="The birthplace of R")
+m  # Print the map
+```
+
+Here is a little more complex example, showing three self-defined markers and a physical background tile. Click on the markers to see their labels. Note that you can swap the tile for another by naming another favorite background from [Leaflet providers](https://leaflet-extras.github.io/leaflet-providers/preview/) 
+
+```{r example-2}
+# Example with Markers
+popup = c("Robin", "Jakub", "Jannes")
+
+leaflet() %>%
+  addProviderTiles("Esri.WorldPhysical") %>%  # Name a specific  map from among free provider tiles
+  addAwesomeMarkers(lng = c(-3, 23, 11),
+                    lat = c(52, 53, 49), 
+                    popup = popup)
+
+```
+
+The function `leaflet()` returns a Leaflet map widget, which stores a list of objects that can be modified or updated later. Most functions in this package have an argument `map` as their first argument, which makes it easy to use the pipe operator `%>%` in the magrittr package, as you have seen from the example above.
+
+You can manipulate the attributes of the map widget using a series of methods. Please see the help page `?setView` for details.
+
+* `setView()` sets the center of the map view and the zoom level;
+* `fitBounds()` fits the view into the rectangle [lng1, lat1] – [lng2, lat2];
+* `clearBounds()` clears the bound, so that the view will be automatically determined by the range of latitude/longitude data in the map layers if provided;
+
+```{r sydney-set}
+## Sydney with setView
+leaflet() %>%
+  addTiles() %>%
+  addProviderTiles("Esri.WorldImagery", 
+                   options = providerTileOptions(opacity=0.5)) %>% 
+  setView(lng = 151.005006, lat = -33.971, zoom = 10)
+
+```
+
+You can add multiple different layers of background tiles and make them partially transparent as on the Sydney Harbour map above. Alternatively, the example below shows a control panel in top right corner that you can use to switch the layers on and off. 
+
+```{r europe-layers}
+# Europe with Layers
+leaflet() %>% 
+  addTiles() %>% 
+  setView( lng = 2.34, lat = 48.85, zoom = 5 ) %>% 
+  addProviderTiles("Esri.WorldPhysical", group = "Physical") %>% 
+  addProviderTiles("Esri.WorldImagery", group = "Aerial") %>% 
+  addProviderTiles("MtbMap", group = "Geo") %>% 
+
+addLayersControl(
+  baseGroups = c("Geo","Aerial", "Physical"),
+  options = layersControlOptions(collapsed = T))
+
+```
+
+## Sydney Harbour with a selection of ESRI backgrounds
+
+Here is a more sophisticated example or preparing a map document, where you use `grep()` to select all backgrounds originating from ESRI (global leader in spatial data market), feed them in, zoom on Sydney harbour and add widgets like map inset and measuring stick with `addMinimap()` and `addMeasure()`. 
+```{r ausmap}
+# Set the location and zoom level
+leaflet() %>% 
+  setView(151.2339084, -33.85089, zoom = 13) %>%
+  addTiles()  # checking I am in the right area
+
+
+# Bring in a choice of esri background layers  
+
+l_aus <- leaflet() %>%   # assign the base location to an object
+  setView(151.2339084, -33.85089, zoom = 13)
+
+esri <- grep("^Esri", providers, value = TRUE)
+
+# make sure you run the next three lines together else the for-loop will not work
+for (provider in esri) {
+  l_aus <- l_aus %>% addProviderTiles(provider, group = provider)
+}
+
+# create the basic map document
+AUSmap <- l_aus %>%
+  addLayersControl(baseGroups = names(esri),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  addMiniMap(tiles = esri[[1]], toggleDisplay = TRUE,
+             position = "bottomright") %>%
+  addMeasure(
+    position = "bottomleft",
+    primaryLengthUnit = "meters",
+    primaryAreaUnit = "sqmeters",
+    activeColor = "#3D535D",
+    completedColor = "#7D4479") %>% 
+  htmlwidgets::onRender("
+                        function(el, x) {
+                        var myMap = this;
+                        myMap.on('baselayerchange',
+                        function (e) {
+                        myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
+                        })
+                        }") %>% 
+addControl("", position = "topright")
+
+AUSmap # display the map document
+```
+
+Voila! Now you have a fantastic, interactively controllable background map. Notice that some layers may be too low resolution to show properly at this level of zoom, but will pop in view as you zoom out. Also, you should now understand why the tiles are called tiles, seeing how the background imagery is rendering a tile at a time.
+
+When you achieve a particularly successful map, you can save it with all its components and email to colleagues - a great feat if you wish to collaborate on spatial data and friends or colleagues have no ready spatial visualisation skills.
+```{r save-map}
+library(htmlwidgets)
+saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
+```
+
+
+Now that we have learned the basics of using the Map Widget, let learn how to add our own data to it. Before we get there, here are two exercises:
+
+## Create your own map document centered on Denmark
+
+First, create a Danish equivalent of `AUSmap` with ESRI layers and call it `DKmap`
+```{r dkmap}
+## YOUR CODE HERE
+```
+
+
+## Create spatial data
+
+Next, create some point data by collecting their location via longitude and latitude. Open GoogleMaps and following the guidelines from the slides, start collecting spatial data into the coordinates column of the provided [Googlesheet](https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479). Find 3-4 of your favorite places in Denmark, copy their coordinates, document their names, the reasons for popularity and rating. *Do not write into the Longitude/Latitude columns! * These columns need to be very consistent and are populated automatically. 
+
+When done, put up green sticky note and try to read the googlesheet data into your DKmap document.
+
+Let's run:
+
+```{r libraries}
+# Libraries
+library(tidyverse)
+library(googlesheets4)
+library(leaflet)
+```
+
+Read in the data from googlesheet with `read_sheet()` function, specifying the path, the column datatype and the `range`. This should just work, allowing you to sign in into your google account en route. If it does not and you get authentication errors, uncomment line 191 and run with that. 
+```{r read-sheet}
+gs4_deauth() # if the authentication is not working for you
+
+places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479",
+                     range = "SA2022",
+                     col_types = "cccnncnc")
+glimpse(places)
+```
+
+Once you verify that the places are all in, and the longitude and latitude columns are in fact decimal numbers, add them to the map document with `addMarkers()`
+
+```{r add-data}
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(lng = places$Longitude, 
+             lat = places$Latitude,
+             popup = places$Description)
+```
+
+Given that this little chunk basically is a sequence of commands that starts with 'create a map' and continues with 'addMarkers()',  add these points to your DKmap document
+
+## Add your and your colleagues' data to your DKmap document
+
+Try doing this in three steps
+
+- reuse your `DKmap` object and add points to it with `addMarkers()`
+- build the popup labels to contain both the name and description of the place, concatenating them with `paste0()` or similar, using html markers to signal line breaks, etc.
+- use clustering option to the markers to make their viewing easier
+
+You can find the tips for this on the [Leaflet R website](https://rstudio.github.io/leaflet/markers.html). Look for the Popups in the the left menu and Marker Clusters under markers.
+```{r dkmap-data}
+# YOUR CODE
+
+```
+
+Save your map and rejoice!
+
+## References
+
+The "leaflet" R package is copyright © 2014-2016 RStudio, Inc.
+The Leaflet JavaScript library is © 2010–2016 [Vladimir Agafonkin](https://agafonkin.com/), 2010–2011 CloudMade.
