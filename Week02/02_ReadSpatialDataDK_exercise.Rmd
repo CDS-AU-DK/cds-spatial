@@ -454,9 +454,9 @@ tm_shape(aarhus) +
 
 Great work! As you noticed, you mostly can't plot layers together if they don't have the same CRS. You'll see later that there are exceptions but it is definitely best practice to ensure the layers you'll work with have a common, projected CRS.
 
-# Bonus: Loading data from the internet
+# Task 12: Loading data from the internet
 
-There are a lot of online resources for spatial data, such as OSM, AirBnB, GoogleMaps, DivaGIS, and GADM database. In the exercise you will learn to work with rasters from the GADM database which contains spatial data - vector and raster  -  for all current countries and is well-integrated with R. You can load the data directly into R with the function getData() and start processing. The available data are:
+There are a lot of online resources for spatial data, such as OSM, AirBnB, GoogleMaps, DivaGIS, and GADM database. In the exercise you will learn to work with rasters from the GADM database which contains spatial data - vector and raster  -  for all current countries and is well-integrated with R. You can load the data directly into R with the function `getData()` and start processing. The available data are:
 
 * SRTM 90 (elevation data with 90m resolution between latitude  -60 and 60)
 * World Climate Data (Tmin, Tmax, Precip, BioClim)

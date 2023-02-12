@@ -25,8 +25,9 @@ opts_knit$set(width=75)
 
 #  Goals: 
 
-1. In the first exercise, you will learn to construct maps with tmaps() by modifying the provided code. The libraries, data, and initial code is provided below.
+1. In the first exercise, you will learn to construct maps with `tmap()` by modifying the provided code. The libraries, data, and initial code is provided below.
 2. In the second exercise, you learn to: 
+
  - Understand the provided datasets
  - Learn how to reproject spatial data
  - Limit your data into an area of interest
@@ -36,8 +37,8 @@ opts_knit$set(width=75)
 
 #### Required R libraries
 
-We will use the sf, raster, and tmap packages.
-Additionally, we will use the spData and spDataLarge packages that provide new datasets. To install the spDataLarge please load it directly from the author's github repository at https://github.com/Nowosad/spDataLarge. If the line in the chunk below does not work, check the repository for the other options.
+We will use the `sf`, `raster`, and `tmap` packages.
+Additionally, we will use the `spData` and `spDataLarge` packages that provide new datasets. To install the `spDataLarge`, please load it directly from the author's github repository at https://github.com/Nowosad/spDataLarge. If the line in the chunk below does not work, check the repository for the other options.
 
 ```{r}
 library(sf)
@@ -47,13 +48,14 @@ library(spData)
 
 # To install the spDataLarge uncomment the next line
 #install.packages("spDataLarge", repos = "https://geocompr.r-universe.dev")
+#install.packages("spData")
 library(spDataLarge)
 ```
 
 
 #  Exercise 1 - Make a map
 
-In this exercise you will learn to make a map with tmaps library, by adding spatial data layers and modifying the arguments that specify their rendering
+In this exercise you will learn to make a map with `tmap` library, by adding spatial data layers and modifying the arguments that specify their rendering
 
 #### Data sets  
 
@@ -62,7 +64,7 @@ The first one is an elevation raster object for the New Zealand area, and the se
 
 #### Existing code
 
-Here is the code to create a new map of New Zealand (following Robin Lovelace's example).Your role is to improve this map based on the suggestions below.
+Here is the code to create a new map of New Zealand (following Robin Lovelace's example). Your role is to improve this map based on the suggestions below.
 
 ```{r initial-map}
 tm_shape(nz_elev)  +
@@ -77,7 +79,7 @@ tm_shape(nz_elev)  +
   tm_compass(position = c("LEFT", "center"),
              type = "rose", 
              size = 2) +
-  tm_credits(text = "A. Sobotkova, 2022") +
+  tm_credits(text = "A. Sobotkova, 2023") +
   tm_layout(main.title = "My map",
             bg.color = "orange",
             inner.margins = c(0, 0, 0, 0))
@@ -115,7 +117,7 @@ The first one is an elevation raster object for the Zion National Park area in I
 Read two new datasets, `srtm` and `zion`, using the code below and then follow the instructions and answer the questions related.
 
 ####  Preparation: Load data from provided package
-You need to have installed the spDataLarge package for the following code to work. 
+You need to have installed the `spDataLarge` package for the following code to work. 
 
 ```{r load-data}
 srtm  <-  raster(system.file("raster/srtm.tif", package = "spDataLarge"))
@@ -153,18 +155,18 @@ Type answers to the questions as code comments next to or under the code used
 
 # Exercise 3 - Reconciling Coordinate systems
 
-Now that you know that coordinate systems differ, make them compatible!
+Now that you know that coordinate systems differ, make them compatible twice over, converting to one and then another CRS!
 
 
 ## Instructions
 
 * Reproject the `srtm` dataset into the coordinate reference system used in the `zion` object. 
 
-  - Create a new object `srtm2`
+  - Create a new object `srtm2` with the `zion` crs. You can label it `srtm_####` writing the EPSG out for easy differentiation.
   - Visualize the results using the `plot()` function.
 
 * Reproject the `zion` dataset into the coordinate reference system used in the `srtm` object.
-  - Create a new object `zion2`
+  - Create a new object `zion2` or `zion_####` with the `srtm` crs.
   - Visualize the results (`zion2` together with `srtm`) using the `plot()` function.
 
 ## Your solution
@@ -179,14 +181,15 @@ Now that you know that coordinate systems differ, make them compatible!
 
 # Exercise 4 - Make a map of Denmark (Optional)
 
-Make a handsome map of Denmark from data available online with a scale, a north arrow and source credits!
+Make a handsome map of Denmark from data available online with a scale, a north arrow and source credits! Project the data to EPSG 32632, the UTM for Denmark.
 
 ## Hints
 
 *Load elevation and regional boundaries for Denmark using the `getData()` function from the `raster` package. 
 
   - Remember that the `getData()` function takes a number of different attributes, plus the country code in a ISO 3-letter format. You can google what it is for Denmark, or use the `getData('ISO3')` function to view it. For an example of how to use the `getData()` function [see this blog](https://www.gis-blog.com/r-raster-data-acquisition/)
-* Make a map with `tmaps` library following the Exercise no.1
+* What is the data's coordinate system? Project it to EPSG 32632
+* Make a map with `tmap` library following the Exercise no.1
 
 ## Your solution
 ```{r}
@@ -195,4 +198,8 @@ Make a handsome map of Denmark from data available online with a scale, a north 
 
 # /End Code/ #
 ```
+
+
+## Refs
+Tennekes, Martijn. 2019. Tmap: Thematic Maps. https://CRAN.R-project.org/package=tmap.
 
