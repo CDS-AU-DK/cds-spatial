@@ -7,14 +7,14 @@ library(leaflet)
 
 # Load some data the from Chicago data portal
 # https://data.cityofchicago.org/Public-Safety/Crimes-2017/d62x-nvdr
-crimes <- read_csv("../Week01/data/ChicagoCrimes2017.csv")
+crimes <- read_csv("data/ChicagoCrimes2017.csv")
 glimpse(crimes)
 
 # What's in Primary Type?
 unique(crimes$`Primary Type`) # too many options for mapping
 
 # Get 6 top crimes
-crime <- ChicagoCrimes2017 %>% 
+crime <- crimes %>% 
   group_by(`Primary Type`) %>% 
   tally() %>% 
   arrange(desc(n)) %>% 
