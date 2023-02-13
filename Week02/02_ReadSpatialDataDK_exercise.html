@@ -1351,7 +1351,7 @@ Plotting Spatial Data</a></h2>
                   <p class="author"><span class="glyphicon glyphicon-user"></span> Adela
 Sobotkova</p>
                         <p class="date"><span class="glyphicon glyphicon-calendar"></span> 04/01/2021
-updated 2023-02-12</p>
+updated 2023-02-13</p>
           </div>
    </div>
      
@@ -1538,6 +1538,12 @@ tibble can provide a better print out of the object.</p>
 </div>
 <div id="task-4-extract-geometric-information-from-your-vector-layers" class="section level1">
 <h1>Task 4: Extract geometric information from your vector layers</h1>
+<p>Sometimes you spatial data will come with attributes such as area,
+length, etc. Unless you have just created these yourself, you cannot be
+sure of their provenance and accuracy. They may have also changed in the
+course of your spatial transformations. If you want to know what is the
+actual area of your polygons, then you can extract it directly from the
+geometries.</p>
 <p>There are several functions in <code>sf</code> that allow you to
 access geometric information like area from your vector features. For
 example, the functions <code>st_area()</code> and
@@ -1583,10 +1589,10 @@ forests with <code>unclass(areas)</code> &gt; 200000 (areas greater than
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a quick histogram of the areas using hist</span></span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">___</span>(___)</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Filter to forests greater than 30000 (square meters)</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Filter to forests greater than 200000 (square meters)</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>big_forests <span class="ot">&lt;-</span> ___ <span class="sc">%&gt;%</span> <span class="fu">___</span>(<span class="fu">___</span>(___) <span class="sc">&gt;</span> <span class="dv">200000</span>)</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Can you plot the forests with their names?</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Can you plot the big_forests with their names??(hint: check the plotting section in Task 5 below)</span></span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot just the geometry of big_forests</span></span>

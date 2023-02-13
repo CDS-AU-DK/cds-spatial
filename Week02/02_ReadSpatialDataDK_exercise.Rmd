@@ -151,6 +151,8 @@ df$___[___]
 You now have a better sense of what a list column is. You can see how it can be used to store far more information in a single variable than other types of columns. These list-columns are how `sf` stores detailed geographic information on each feature in a single record. Converting the data frame to a tibble is not necessary but a tibble can provide a better print out of the object.
 
 # Task 4: Extract geometric information from your vector layers
+Sometimes you spatial data will come with attributes such as area, length, etc. Unless you have just created these yourself, you cannot be sure of their provenance and accuracy. They may have also changed in the course of your spatial transformations. If you want to know what is the actual area of your polygons, then you can extract it directly from the geometries. 
+
 There are several functions in `sf` that allow you to access geometric information like area from your vector features. For example, the functions `st_area()` and `st_length()` return the area and length of your features, respectively.
 
 Note that the result of functions like `st_area()` and `st_length()` will not be a traditional vector. Instead the result has a class of `units` which means the vector result is accompanied by metadata describing the object's units. As a result, code like this won't quite work:
@@ -196,10 +198,10 @@ areas <- ___(forests)
 # Create a quick histogram of the areas using hist
 ___(___)
 
-# Filter to forests greater than 30000 (square meters)
+# Filter to forests greater than 200000 (square meters)
 big_forests <- ___ %>% ___(___(___) > 200000)
 
-# Can you plot the forests with their names?
+# Can you plot the big_forests with their names??(hint: check the plotting section in Task 5 below)
 
 
 # Plot just the geometry of big_forests
