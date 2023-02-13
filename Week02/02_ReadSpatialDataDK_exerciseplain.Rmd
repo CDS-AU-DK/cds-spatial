@@ -230,7 +230,7 @@ Multi-band rasters will have more than one layer. An example is a color aerial p
 1. What are the dimensions (number of columns and rows) of the `elevation` raster?
 2. What is the resolution of `aarhus` orthophoto? How many layers does it contain and what do they represent?
 
-Now you've learned how to read in single and multi-band rasters. You should have noticed, based on the `nlayers()` function, that the `elevation` object has a single layer and the `aarhus` object has four.
+Now you've learned how to read in single and multi-band rasters. You should have noticed, based on the `nlayers()` function, that the `elevation` object has a single layer and the `aarhus` object has five (well, four useful ones, if you plot it).
 
 
 # Task 7: Learn about your raster objects
@@ -270,7 +270,7 @@ The raster package has added useful methods for plotting both single and multi-b
 ```
 
 
-Nice work! As you can see, the `plot()` function can be used to plot single layers while the `plotRGB()` function can be used to combine layers into a single image. Plotting two raster objects of different extents, resolution and CRS can not be done without additional wrangling
+Nice work! As you can see, the `plot()` function can be used to plot single layers while the `plotRGB()` function can be used to combine layers into a single image. Plotting two raster objects of different extents, resolution and CRS can not be done without additional wrangling.
 
 
 
