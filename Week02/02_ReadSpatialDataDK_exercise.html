@@ -1351,7 +1351,7 @@ Plotting Spatial Data</a></h2>
                   <p class="author"><span class="glyphicon glyphicon-user"></span> Adela
 Sobotkova</p>
                         <p class="date"><span class="glyphicon glyphicon-calendar"></span> 04/01/2021
-updated 2023-02-13</p>
+updated 2023-02-15</p>
           </div>
    </div>
      
@@ -1673,6 +1673,8 @@ multi-band raster called “Aarhus_1m.TIF”).</li>
 raster object you read in.</li>
 <li>Use the <code>nlayers()</code> function to determine how many
 bands/layers are in each object.</li>
+<li>Use the <code>res()</code> function to learn the resolution of the
+image</li>
 </ul>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the raster package</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">___</span>(___)</span>
@@ -1689,7 +1691,11 @@ bands/layers are in each object.</li>
 <span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Identify how many layers each object has</span></span>
 <span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="fu">nlayers</span>(___)</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="fu">nlayers</span>(___)</span></code></pre></div>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="fu">nlayers</span>(___)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Identify the resolution of each raster</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="fu">___</span>(elevation)</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="fu">___</span>(aarhus)</span></code></pre></div>
 <p><em>Questions:</em></p>
 <ol style="list-style-type: decimal">
 <li>What are the dimensions (number of columns and rows) of the
@@ -1778,7 +1784,11 @@ do it?</li>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>___</span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the aarhus raster as an image</span></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>____</span></code></pre></div>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>____</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the two images together (on top of one another). Hint: it only works if their CRSes are compatible. Return to this after Task 9 and 10 if the CRSes are different.</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>____</span></code></pre></div>
 <p>Nice work! As you can see, the <code>plot()</code> function can be
 used to plot single layers while the <code>plotRGB()</code> function can
 be used to combine layers into a single image. Plotting two raster
