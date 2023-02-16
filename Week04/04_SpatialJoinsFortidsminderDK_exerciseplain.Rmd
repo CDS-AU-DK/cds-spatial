@@ -72,7 +72,7 @@ A note about the output of functions that test relationships between two sets of
 ## Instructions
 
 * Load `viking` and `parks` objects and verify consistent projection with `df_sf`
-* Filter `df_sf` to Nobelparken only and create a 10000m buffer `nb_buf` around the point. There is something you will need to do before buffering!
+* Filter `df_sf` from Week03 to Nobelparken only (or recreate the point [10.2033485,56.174346]) and create a 10000m buffer `nb_buf` around the point. There is something you will need to do before buffering!
 * Use `st_intersects()` to identify `viking` that intersect with the buffer object (`nobel_buf`) and call the result `viking_int`.
 * Use `st_contains()` to identify `parks` features that are completely within the buffer object (`buf`) and call the result `parks_cont`.
 * Extract `viking` and parks that intersect and are contained by  `nobel_buf` and save as `int` and `cont`.
