@@ -95,11 +95,3 @@ dev.off()
 # /End Code/ #
 ```
 
-# Map of Danish municipalities and monuments
-
-```{r}
-# /Start Code/ #
-
-
-# /End Code/ #
-```

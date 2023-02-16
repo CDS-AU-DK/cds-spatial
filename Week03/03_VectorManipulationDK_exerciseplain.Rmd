@@ -59,7 +59,7 @@ Also similar to buffering, centroid calculations should generally be performed o
 
 ## Instructions
 
-* Read in the `municipalities` shapefile from GADM database (see Bonus in Week 02).
+* Read in the `municipalities` shapefile from GADM database (see Bonus in Week 02). Note the 32618 CRS.
 * Project/transform the `municipalities` using the EPSG number 25832 as the target CRS. As the municipalities is a SpatialPolygons Dataframe, you will need to use `st_as_sf()` to convert it to `sf` object first.
 * Compute the centroids with `st_centroid()` and store as an object named `centroids`. Only one argument is required.
 * Plot the geometry of `municipalities` object with the centroids on top. This requires two calls to `plot()` run together. The second will need `add = TRUE`.
@@ -80,7 +80,7 @@ In the `sf` package, there is a function for extracting the bounding box coordin
 
 ## Instructions
 
-* Filter out Aarhus kommune from the `municipalities_tf` sf object and create a new `aarhus_mun` object. How exactly is Aarhus spelled and which column do you use? 
+* Filter out Aarhus kommune from the `municipalities_25832` sf object and create a new `aarhus_mun` object. How exactly is Aarhus spelled and which column do you use? 
 * Review that your selection worked by plotting `shelters` over the `aarhus_mun` object - they should overlap.
 * Compute the bounding box coordinates with `st_bbox()`. What is the result?
 * Create a single polygon bounding box around the aarhus municipality using `st_make_grid()` with an argument of `n = 1`.
@@ -137,82 +137,3 @@ A more precise bounding polygon is sometimes needed, one that fits your data mor
 It takes a little getting used to, but when computing a convex hull, you'll need to remember to first *dissolve/union/combine* your individual features into a multi-feature. When you used `head()` you should have noticed that you started with “POINT” objects and after `st_union()` you had “MULTIPOINT”. Convex hulls will be super useful in later point analysis as statistical results often depend on the area that encloses the features of interest, and sometimes you need as tight as envelope as possible.
 
 
-# Task 6: Spatial joins - Danish monuments
-In this task, you will find out which municipality in Denmark has the most Viking-era monuments and finds registered. You will work with spatial data from [Fund og Fortidsminder](https://www.kulturarv.dk/fundogfortidsminder/Download/), namely a shapefile in ETRS89/UTM32N projection that collects information on 300,000 registered monuments.
-
-For many analysis types you need to link geographies spatially. For example, you want to know how many Viking-era cultural monuments/artefacts (fortidsminder) are in each municipality but you don't have a municipality attribute in the data. The best way to do this is with a spatial join using `st_join()`.
-
-Importantly, the `st_join()` function requires `sf` data frames as input and will not accept an object that is just `sf` geometry. You can use the `st_sf()` function to convert `sf` geometry objects to an sf data frame (`st_sf()` is essentially the opposite of `st_geometry()`).
-
-## Instructions
-
-* Download the fortidsminder archive from [Sciencedata](https://sciencedata.dk/shared/ce0f8e62af16dab66b45f13be90d00f8) and unzip. 
-* Load the anlaeg_all_25832.shp into a `monuments` sf object. It might take couple seconds, because there are 300k of them.
-* Filter the monuments object to those from the Viking-era ("Vikingtid")
-* Plot the monuments (`viking`) on top of the municipalities. You will want to plot only the geometry of the municipalities.
-* Use `class()` to see if the `viking` object has class `data.frame` or if it's just geometry.
-* Use `st_join()` to conduct a spatial join in order to add municipality information to the `viking` object.
-* Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`NAME_2`).
-* What five municipalities contain the most monuments? Which have the least and why? 
-* Challenge: can you plot those five municipalities that contain the fewest viking finds on a map of Denmark? You can use the `st_intersect()` function and select municipalities which satisfy the intersection with fewest finds. 
-
-```{r monuments-munic, eval=FALSE}
-# YOUR CODE
-```
-
-Great! The monuments object did not have municipality information until you performed the spatial join with `st_join()`. Now that the municipality information is included you can supply each municipality office with the count and coordinates of monuments they are in charge of so they can monitor and safeguard.
-
-# Task 7: Spatial relationships
-In the previous exercise, you loaded all monuments across Denmark. In this exercise you need to make a plan for family visit. Your family like to bike in green areas and visit viking monuments, so calculate:
-
-*a) how many viking monuments are within 10000 m radius of Nobelparken and 
-*b) how many parks are completely within this area as well.  
-
-To achieve this, you will need to select the third object in the buffer (Nobelparken) and then use `st_intersects()` to tally the monuments within 10000m radius  and `st_contains()` to determine how many parks are *completely* within the buffer. You will then use the `st_intersection()` function (notice the slight difference in function name!) to **clip** the monuments and parks to the buffer.
-
-A note about the output of functions that test relationships between two sets of features. The output of these and related functions is a special kind of list (with the class `sgbp`). For example, when using `st_intersects()`, the first element in the output can be accessed using `[[1]]`, which shows features from the monuments object that intersect with the buffer polygon. Likewise, `[[2]]` would show the buffer polygons that intersect with the monuments.
-
-## Instructions
-
-* Load `viking` and `parks` objects and verify consistent projection with `df_sf`
-* Filter `df_sf` to Nobelparken only and create a 10000m buffer `nb_buf` around the point. There is something you will need to do before buffering!
-* Use `st_intersects()` to identify `viking` that intersect with the buffer object (`nobel_buf`) and call the result `viking_int`.
-* Use `st_contains()` to identify `parks` features that are completely within the buffer object (`buf`) and call the result `parks_cont`.
-* Extract `viking` and parks that intersect and are contained by  `nobel_buf` and save as `int` and `cont`.
-* Use the `int` object you just created to identify the IDs of the monuments that intersect with buffer (the first will be XXXX).
-* Use `st_intersection()` to "clip" the monuments by `nobel_buf` and call this `viking_clip`. Do the same with parks. 
-* Plot the result
-
-```{r intersect, eval=FALSE}
-# YOUR CODE
-```
-
-
-#### Questions: 
-
-1. What is the class of the object produced via `st_intersects()`?
-2. Why do we use `parks[cont,]` to view the fully contained parks in the buffer plot?
-3. How many parks and viking monuments respectively are there within the buffer?
-
-The `sf` package has a lot of different functions for determining relationships. Some are easy to conflate!  You have just used `st_intersects()` and `st_contains()` here but there are others as well and what you use will depend on what relationships you're looking at. In this exercise you also used the important `st_intersection()` function to clip one layer based on another.
-
-# Task 8: Measuring distance between features
-Of course, measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
-
-In this exercise you'll measure the distance from the Nobelparken to the viking monuments within the 10km buffer and identify the 10 closest ones.
-
-## Instructions
-
-* Filter Nobelparken out of `db_sf` POINT feature and project to a planar CRS. 
-* Test whether the CRS of `cities` matches the CRS of the preloaded object `viking_clip` with `st_crs()`.
-* Use `st_distance()` to compute the distance between Nobelparken to the viking monuments within the 10km buffer .
-* Use `head()` to take a quick look at the result.
-* Identify the index of the 10 sites with the smallest distance. This may take several steps that include `sort()` and `which()` functions.
-* Use `nearest10` to pull out the rows from `viking` of the nearest viking monument (see the `anlaegsbet` variable).
-
-```{r nearest, eval=FALSE}
-# YOUR CODE
-```
-
-
-Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)
