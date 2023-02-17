@@ -47,6 +47,7 @@ library(tmap)
 library(spData)
 
 # To install the spDataLarge uncomment the next line
+
 #install.packages("spDataLarge", repos = "https://geocompr.r-universe.dev")
 #install.packages("spData")
 library(spDataLarge)
@@ -179,9 +180,9 @@ Now that you know that coordinate systems differ, make them compatible twice ove
 ```
 
 
-# Exercise 4 - Make a map of Denmark (Optional)
+# Exercise 4 - Make a map of Denmark
 
-Make a handsome map of Denmark from data available online with a scale, a north arrow and source credits! Project the data to EPSG 32632, the UTM for Denmark.
+Make a handsome map of Denmark! Download data about DK available online and visualize with a scale, a north arrow and source credits.  Project the data to EPSG 32632. Include a bounding box around the municipality your favorite Danish personality (author/inventor/grandma) lives/lived in. In the title, explain whose birthplace you are putting in focus and include a legend for any environmental background data.
 
 ## Hints
 
@@ -189,7 +190,10 @@ Make a handsome map of Denmark from data available online with a scale, a north 
 
   - Remember that the `getData()` function takes a number of different attributes, plus the country code in a ISO 3-letter format. You can google what it is for Denmark, or use the `getData('ISO3')` function to view it. For an example of how to use the `getData()` function [see this blog](https://www.gis-blog.com/r-raster-data-acquisition/)
 * What is the data's coordinate system? Project it to EPSG 32632
-* Make a map with `tmap` library following the Exercise no.1
+* Choose a reasonable classification if you are using environmental data.
+* Create a bounding box over the municipality (see Week03 in-class exercise) of your favorite DK person
+* Make a clean and legible map of DK and the focus area with `tmap` library following the Exercise no.1 above and the guide [here](https://cran.r-project.org/web/packages/tmap/vignettes/tmap-getstarted.html) 
+
 
 ## Your solution
 ```{r}
