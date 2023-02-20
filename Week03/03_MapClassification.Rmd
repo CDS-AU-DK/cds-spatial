@@ -71,10 +71,8 @@ d <- tm_shape(nz) + tm_polygons(col = "Population", style = "equal", n = 5)
 
 # Write maps above to objects and plot them side by side 
 # with tmap_arrange() for better comparison
-tmap_arrange(___,___,___,___)
-
+tmap_arrange( ___,___, ___,___)
 ```
-
 
 
 #### Questions

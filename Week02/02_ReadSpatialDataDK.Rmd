@@ -1,0 +1,720 @@
+---
+title: "Week 02 - Introduction to Reading and Plotting Spatial Data"
+author: "Adela Sobotkova"
+date: "04/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+options(scipen=999)
+```
+
+# Introduction into GIS in R
+There are a few key spatial packages available for Spatial Analysis in R, which you need to install as you progress through these exercises. The most basic are 
+
+* `sf` for working with vector data
+* `raster` for working with raster data
+* `rgdal` for an R-friendly GDAL interface
+
+The installation of the geospatial libraries GDAL, GEOS and PROJ.4 varies significantly based on operating system (and can be entailed). All of these are dependencies for `sf`, the R package that we will be using for spatial data operations throughout this course. Please follow the Option A: Local installation instructions for your operating system on [this page](https://datacarpentry.org/geospatial-workshop/setup.html) under the heading GDAL, GEOS, and PROJ.4 and continue through the R Packages. Click on the linked pages to make your life easier.
+
+# Task 1: Reading vector data
+The `sf` package, created by Edzer Pebesma and colleagues, has dramatically simplified reading vector spatial data into R.
+
+In this exercise you will read in three shapefiles (parks, playgrounds, and forests one point file and two polygon files) and one geojson (shelters) using `st_read()`. If you've read in the files correctly, you will see a standard R data frame except it will show some header metadata about the file and you'll see a special `geometry` column which we will discuss later.
+
+## Instructions
+
+* Load the `sf` package.
+* All your datasets reside in the 'data' folder.
+* Import the `forests` shapefile ("forests.shp").
+* Import the `playgrounds` shapefile ("playgrounds4326.shp").
+* Import the `parks` shapefile ("parks.shp").
+* Import the `shelters` geojson ("shelters.json").
+* Use the `head()` function and identify the first few features of each layer.
+
+```{r load, eval=FALSE, echo=TRUE}
+# Load the sf package
+___(___)
+
+# Read in the forests shapefile
+forests <- ___("../data/forests.shp")
+
+# Read in the parks shapefile
+parks <- ___(___)
+
+# Read in the playgrounds shapefile
+playgrounds <- ___(___)
+
+# Read in the shelters json
+shelters <- ___(___)
+
+# View the first few features of all layers
+___(___)
+```
+
+## Questions: 
+
+1. How many features does each layer contain and what kind of geometry are they?
+2. What is the CRS value in these objects?
+
+
+### Solution
+```{r load data, echo = FALSE}
+# Load the sf package
+library(sf)
+
+# Read in the parks shapefile
+parks <- st_read("../data/parks.shp")
+
+# Read in the forests shapefile
+forests <- st_read("../data/forests.shp")
+
+# Read in the playgrounds shapefile
+playgrounds <- st_read("../data/playgrounds4326.shp")
+
+# Read in the geojson
+shelters <- st_read("../data/shelters.json")
+
+# View the first shelters, and forests
+head(shelters)
+head(forests)
+head(parks)
+```
+
+Well done, now you should see how easy it can be to read in shapefiles and you got your first taste of what an sf object looks like.
+
+<br>
+
+
+# Task 2: sf objects are data frames
+Spatial objects in `sf` are just data frames with some special properties. This means that packages like `dplyr` can be used to manipulate `sf` objects. In this exercise, you will use the `dplyr` functions `select()` to select or drop variables, `filter()` to filter the data and `mutate()` to add or alter columns.
+
+
+## Instructions
+
+* Load the `dplyr` and `sf` packages.
+* Use the `filter()` function from `dplyr` on the `parks` object to create a new data frame limited to parks greater than 5ha.
+* Use the `nrow()` function on your new object to determine how many parks greater than 5ha are in the dataset.
+* Use the `select()` function from dplyr to limit the variables in your over5ha dataset to just `navn` and `areal_m2` and create a new data frame.
+* Use the `head()` function to check which variables exist in your new data frame. Does the data frame only have the `navn` and `areal_m2` columns (the answer is no, why)?
+
+```{r wrangle-parks, eval=FALSE, echo=TRUE}
+# Load the sf package
+___
+
+# ... and the dplyr package
+___
+
+# Use filter() to limit to over5ha parks
+___
+
+# Count the number of rows
+___(over5ha)
+
+# Limit to navn and areal_m2 variables
+over5_lim <- over5ha %>% ___(navn, areal_m2) 
+
+# Use head() to look at the first few records
+___(over5_lim)
+```
+
+
+### Solution
+```{r wrangle-parks-sol, echo=FALSE}
+# Load the sf package
+library(sf)
+
+# ... and the dplyr (or tidyverse) package
+library(dplyr)
+
+hist(parks$areal_m2)
+# Use filter() to limit to over5ha parks
+over5ha <- parks %>% 
+  filter(areal_m2 > 50000)
+
+# Count the number of rows
+nrow(over5ha)
+
+# Limit columns to navn and areal_m2 variables
+over5_lim <- over5ha %>% dplyr::select(navn, areal_m2) 
+
+# Use head() to look at the first few records
+plot(over5_lim$geometry)
+```
+Great! You can see why the `sf` package is so nice – your spatial objects are data frames that you can smoothly manipulate with `dplyr`. The number of parks over 5ha is 17
+You may have noticed that when you used `select` the default is to keep the geometry column even if you didn't explicitly list it as a column in select.
+
+
+# Task 3: Geometry is stored in list-columns
+A major innovation in `sf` is that spatial objects are data frames. This is possible thanks, in part, to the list-column.
+
+A list-column behaves, to a certain extent, like any other R column. The main difference is that instead of a standard value such as a single number, character or boolean value, each observation value in that column is a piece of an R list and this list can be as complex as needed. The list column allows you to store far more information in a single variable and `sf` takes advantage of this by storing all geographic information for each feature in the list.
+
+In this exercise, you will convert the data frame to what's called a `tibble` with `tibble::as_tibble()` (Note that `dplyr::tbl_df()` is now deprecated).
+
+## Instructions
+
+* Load tidyverse in your workspace.
+* Create a simple data frame `df` that includes a single column `a` using `data.frame()`.
+* Add a list-column `b` to your data frame with the `list()` function.
+* Use `head()` to look at `df`.
+* Use `as_tibble()` to convert the data frame to a tibble and print it to the console. This is just for cleaner printing.
+* Pull out the third observation from columns `a` and `b` using `base` R (you'll need square brackets like `[3]`).
+
+```{r geometry, eval = FALSE, echo = TRUE}
+# Create a standard, non-spatial data frame with one column
+df <- ___(a = 1:3)
+
+# Add a list column to your data frame
+df$b <- ___(1:4, 1:5, 1:10)
+
+# Look at your data frame with head
+___(df)
+
+# Convert your data frame to a tibble and print on console
+___(df)
+
+# Pull out the third observation from both columns individually
+df$___[___]
+df$___[___]
+```
+
+### Solution
+```{r lists, echo=FALSE}
+# Create a standard, non-spatial data frame with one column
+df <- data.frame(a = 1:3)
+
+# Add a list column to your data frame
+df$b <- list(1:4, 1:5, 1:10)
+
+# Look at your data frame with head
+head(df)
+
+# Convert your data frame to a tibble and print on console
+as_tibble(df)
+
+# Pull out the third observation from both columns individually
+df$a[3]
+df$b[3]
+```
+You now have a better sense of what a list column is. You can see how it can be used to store far more information in a single variable than other types of columns. These list-columns are how `sf` stores detailed geographic information on each feature in a single record. Converting the data frame to a tibble is not necessary but a tibble can provide a better print out of the object.
+
+# Task 4: Extract geometric information from your vector layers
+Sometimes you spatial data will come with attributes such as area, length, etc. Unless you have just created these yourself, you cannot be sure of their provenance and accuracy. They may have also changed in the course of your spatial transformations. If you want to know what is the actual area of your polygons, then you can extract it directly from the geometries. 
+
+There are several functions in `sf` that allow you to access geometric information like area from your vector features. For example, the functions `st_area()` and `st_length()` return the area and length of your features, respectively.
+
+Note that the result of functions like `st_area()` and `st_length()` will not be a traditional vector. Instead the result has a class of `units` which means the vector result is accompanied by metadata describing the object's units. As a result, code like this won't quite work:
+
+```{r example1, eval=FALSE, echo=TRUE}
+# This will not work
+result <- st_area(parks)
+result > 100000
+```
+
+Instead you need to either remove the units with `unclass()`:
+
+```{r example2, eval=FALSE, echo=TRUE}
+# This will work
+val <- 100000
+which(unclass(result) > 100000)
+```
+
+or you need to convert `val`'s class to `units`, for example:
+
+```{r example3, eval=FALSE, echo=TRUE}
+# This will work
+units(val) <- units(result)
+which(result > val)
+length(which(result > val))
+```
+
+
+## Instructions
+
+* Check that your `sf` library is still active and the `forests` shapefile in memory
+* Compute the area of the forest units.
+* Create a histogram of the areas using `hist()` to quickly visualize the data spread.
+* Filter the forests object with `filter()` and limit to forests with `unclass(areas)` > 200000 (areas greater than 20 hectares).
+* Can you plot the geometry and their names?
+* Plot the geometry of the result with `plot()` and `st_geometry()`.
+
+
+```{r forests, eval=FALSE, echo=TRUE}
+# Compute the areas of the forests
+areas <- ___(forests)
+
+# Create a quick histogram of the areas using hist
+___(___)
+
+# Filter to forests greater than 200000 (square meters)
+big_forests <- ___ %>% ___(___(___) > 200000)
+
+# Can you plot the big_forests with their names?(hint: check the plotting section in Task 5 below)
+
+
+# Plot just the geometry of big_forests
+___(___(big_forests))
+
+```
+
+
+
+### Solution
+```{r forests-sol, echo=FALSE}
+# Compute the areas of the forests
+areas <- st_area(forests)
+
+# Create a quick histogram of the areas using hist
+hist(areas)
+
+# Filter to forests greater than 200000 (square meters)
+big_forests <- forests %>% filter(unclass(areas) > 200000)
+
+# Can you plot the big_forests geometry and their names?(hint: check the plotting section in Task 5 below)
+big_forests$navn
+plot(big_forests["navn"])
+
+# Plot just the geometry of big_forests
+plot(st_geometry(big_forests))
+
+```
+
+Excellent! Computing geographic information for your vector layers can be done with functions like `st_area()` and `st_length()`. As you saw in this exercise, these functions produce a result that can be used in additional calculations but you need to be careful because the result is a `units` object that requires a little additional processing like using `unclass()`.
+
+
+# Task 5: Plot vector spatial objects
+The function for making a quick map/plot is a function you are already familiar with, `plot()`. You can, for example, type `plot(my_data)` to see your spatial object. The default, though, may not be what you want. The `plot()` function, when applied to `sf` objects, will create a set of maps, one for each attribute in your data. Instead, if you want to create a map of a single attribute you can extract that attribute using, as an example, `plot(my_data["my_variable"])`.
+
+Frequently you just want to plot the raw geometry with no attribute color-coding (e.g., adding county boundaries to a map of points). For this, you can use the `st_geometry()` function to extract the geometry and plot the result. You can either create a new object or you can nest `st_geometry()` within the `plot()` function.
+
+Often, you also want to plot multiple spatial objects together to see if and how they relate. To do this, use the `plot()`function twice in sequence, separated by ; with the second instance containing the `add=TRUE` argument `plot( ,add=TRUE)`. You can use the `col` argument to differentiate each layer by color.
+
+## Instructions
+
+* Use `plot()` to plot the `forest` data using all defaults.
+* Plot just the `areal_m2` attribute of forests.
+* Create a new object that is just the geometry of the forests object with `st_geometry()`.
+* Plot the geometry of the forests (the object you just created).
+* Plot the geometry of the forests and the parks together, making the parks pink and the forests green.
+
+```{r plotting-sf, eval=FALSE}
+# Plot the forests object using all defaults
+___(forests)
+
+# Plot just the areal_m2 attribute of the forests data
+___(forests[___])
+
+# Create a new object of just the forests geometry
+forests_geo <- ___(forests)
+
+# Plot the geometry of the forests data
+___(forests_geo)
+
+# Plot the geometry of the forests and the parks object together
+___(forests_geo, col = "_____");___(parks$geometry, col = _____, add = _____)
+
+```
+
+### Solution
+```{r plotting-sf-sol, echo=FALSE}
+# Plot the forests object using all defaults
+plot(parks$geometry); plot(forests$geometry, add = TRUE)
+
+# Plot just the Area_ha attribute of the forests data
+plot(parks["areal_m2"]); plot(forests["areal_m2"], add = TRUE)
+
+# Create a new object of just the forests geometry
+forests_geo <- st_geometry(forests)
+
+# Plot the geometry of the forests data
+plot(forests_geo)
+
+# Plot the geometry of the forests and the parks object together
+plot(parks$geometry, col = "red"); plot(forests$geometry, col = "green", add = TRUE)
+```
+
+Well done! Yes, these plots are not super pretty but you can't beat `plot()` for a quick look using few keystrokes. And remember you can use `plot(st_geometry(geo_object))` to plot just the geometry of your object.
+
+
+# Task 6: Reading in raster data
+The term "raster" refers to gridded data that can include satellite imagery, aerial photographs (like ortophotos) and other types. In R, raster data can be handled using the `raster` package created by Robert J. Hijmans.
+
+When working with raster data, one of the most important things to keep in mind is that the raw data can be what is known as "single-band" or "multi-band" and these are handled a little differently in R. Single-band rasters are the simplest, these have a single layer of raster values -- a classic example would be an elevation raster where each cell value represents the elevation at that location.
+
+Multi-band rasters will have more than one layer. An example is a color aerial photo in which there would be one band each representing red, green or blue light (RGB).
+
+
+
+## Instructions
+
+* Load the `raster` package.
+* Load the elevation grid DNK_msk_alt.grd with the `raster` function and assign to `elevation` object
+* Read in the orthophoto image with `brick()` (this is  multi-band raster called "Aarhus_1m.TIF").
+* Use the `class()` function to determine the class of each raster object you read in.
+* Use the `nlayers()` function to determine how many bands/layers are in each object.
+* Use the `res()` function to learn the resolution of the image
+
+```{r loadraster, eval=FALSE, echo=TRUE}
+# Load the raster package
+___(___)
+
+# Read in the mound elevation single-band raster
+elevation <- ____(___)
+
+# Read in the orthophoto image multi-band raster
+aarhus <- brick(_____)
+
+# Get the class for the new objects
+class(___)
+class(___)
+
+# Identify how many layers each object has
+nlayers(___)
+nlayers(___)
+
+# Identify the resolution of each raster
+___(elevation)
+___(aarhus)
+```
+
+*Questions:*
+
+1. What are the dimensions (number of columns and rows) of the `elevation` raster?
+2. What is the resolution of `aarhus` orthophoto? How many layers does it contain and what do they represent?
+
+Now you've learned how to read in single and multi-band rasters. You should have noticed, based on the `nlayers()` function, that the `elevation` object has a single layer and the `aarhus` object has five (well, four useful ones, if you plot it).
+
+### Solution
+```{r loadrasters, echo=FALSE}
+# Load the raster package
+library(raster)
+
+# Load elevation data for 
+elevation <- raster("../data/DNK_msk_alt.grd")
+
+
+# Read in the Ikonos image multi-band raster
+aarhus <- brick("../data/Aarhus_1m.TIF")
+
+
+# Get the class for the new objects
+class(elevation)
+class(aarhus)
+
+# Identify how many layers each object has
+nlayers(elevation)
+nlayers(aarhus)
+
+# Identify the resolution of each raster
+res(elevation)
+res(aarhus)
+
+# Answers
+# 1. 1;4
+# 2. 30,30; 10,10
+```
+
+
+# Task 7: Learn about your raster objects
+Instead of storing raster objects in data frames, the `raster` package stores spatial data in specially designed R classes that contain slots where the data and metadata are stored. The data and metadata can be accessed using a suite of functions. For example, the spatial extent (the bounding box) of the object can be accessed with `extent()`, the coordinate reference system can be accessed with `crs()` and the number of grid cells can be determined with `ncell()`.
+
+## Instructions
+
+* You should have `raster` package loaded, and have the  `elevation` layer and ortophoto image layer for Aarhus in memory.
+* Use the `extent()` function to get the extent of the `elevation` and `aarhus` layer.
+* Use the `crs()` function to get the coordinate reference system of `aarhus` and `elevation`.
+* Use the `ncell()` function to determine how many grid cells are in the `elevation` layer and the `aarhus` layer.
+
+```{r load raster, eval=FALSE, echo=TRUE}
+# Get the extent of the elevation and aarhus object
+___(___)
+
+# Get the CRS of the aarhus and elevation object
+___(___)
+
+# Determine the number of grid cells in both raster objects
+___(aarhus)
+___(elevation)
+```
+
+### Solution
+```{r load raster sol, echo=FALSE}
+# Load the raster package
+library(raster)
+
+# Get the extent of the elevation object
+extent(elevation)
+extent(aarhus)
+
+# Get the CRS of the aarhus object
+crs(aarhus)
+crs(elevation)
+
+# Determine the number of grid cells in both raster objects
+ncell(aarhus)
+ncell(elevation)
+```
+
+Great work! Although rasters are not stored as data frames, the metadata can easily be extracted using functions like `extent()`, `crs()` and `ncell()`.
+
+*Question 3: It makes sense that the extents and number of cells for Danish national elevation data and Aarhus city would be different because their sizes diverge, but why are the units so different? What are these units?*
+
+
+# Task 8: Plot your raster object
+Similar to what you saw in the exercises related to vector objects it's often useful to quickly look at a map of your raster objects with the `plot()` function.
+
+The raster package has added useful methods for plotting both single and multi-band rasters. For single-band rasters or for a map of each layer in a multi-band raster you can simply use `plot()`. If you have a multi-band raster with layers for red, green and blue light you can use the `plotRGB()` function to plot the raster layers together as a single image.
+
+## Instructions
+
+* Plot the `elevation` raster with the `plot()` function, it is a single-band raster.
+* Plot the `aarhus` object with the `plot()` function, it is a multi-band raster.
+* Plot the `aarhus` raster with `plotRGB()` to see all layers plotted together as a single image. Check out the optional `stretch` argument in this function, and set it to `linear` to brighten the image up a little
+* Try to plot the two images together (on top of one another). Can you do it?
+
+```{r plot raster, eval=FALSE, echo=TRUE }
+# Plot the elevation raster (single raster)
+___
+
+# Plot the aarhus raster (as a single image for each layer)
+___
+
+# Plot the aarhus raster as an image
+____
+
+# Plot the two images together (on top of one another). Hint: it only works if their CRSes are compatible. Return to this after Task 9 and 10 if the CRSes are different.
+____
+```
+
+### Solution
+```{r plot raster sol, echo=FALSE}
+# Plot the elevation raster (single raster)
+plot(elevation)
+
+# Plot the aarhus raster (as a single image for each layer)
+plot(aarhus)
+
+# Plot the aarhus raster as an image
+plotRGB(aarhus, stretch = "lin")
+
+# Plot the two images together (on top of one another)
+plotRGB(aarhus, stretch = "lin"); plot(elevation, add = TRUE)
+```
+
+Nice work! As you can see, the `plot()` function can be used to plot single layers while the `plotRGB()` function can be used to combine layers into a single image. Plotting two raster objects of different extents, resolution and CRS can not be done without additional wrangling
+
+
+
+# Task 9: Vector and raster coordinate systems
+In order to perform any spatial analysis with more than one layer, your layers should share the same coordinate reference system (CRS) and the first step is determining what coordinate reference system your data has. To do this you can make use of the `sf` function `st_crs()` and the `raster` function `crs()`.
+
+When the geographic data you read in with `sf` already has a CRS defined both `sf` and `raster` will recognize and retain it. When the CRS is not defined you will need to define it yourself using either the EPSG number or the proj4string.
+
+## Instructions
+
+* Ensure the packages `sf` and `raster` and the objects `forests` and `playgrounds` and `aarhus` and `elevation` are loaded in your workspace.
+* Use `st_crs()` to identify if a CRS exists and what it is for the `playgrounds` and `forests` objects.
+* Use the `st_crs()` function to define/assign a CRS to the `playgrounds` object, utilising the  EPSG number 4326 as that is the original projection (now lost).
+* Use `crs()` to identify if a CRS exists and what it is for the `aarhus` and `elevation` objects.
+* Do not use the `crs()` function to define/assign a CRS to the `elevation` object as it already has a CRS of its own and renaming it won't change the properties of the file.
+
+```{r crs, eval=FALSE}
+# Determine the CRS for the elevation and playgrounds vector objects
+___(forests)
+___(playgrounds)
+
+# Assign the CRS to playgrounds
+crs_1 <- _____
+___(playgrounds) <- crs_1
+
+# Determine the CRS for the aarhus and elevation rasters
+___(aarhus)
+___(elevation)
+
+# Write here the proj4string for the aarhus layer
+crs_2 <- "___"
+
+```
+
+## Solution
+
+```{r crs-sol, echo=TRUE}
+# Determine the CRS for the elevation and playgrounds vector objects
+st_crs(forests)
+st_crs(playgrounds)
+
+# Assign the CRS to playgrounds - its CRS is actually 4326, it just got lost in transport
+crs_1 <- 4326
+st_crs(playgrounds) <- crs_1
+
+# Determine the CRS for the aarhus and elevation rasters
+crs(aarhus)
+crs(elevation)
+
+# Assign the CRS to elevation
+crs_2 <- "+proj=utm +zone=32 +ellps=GRS80 +units=m +no_defs"
+```
+
+Nice! You can determine what the CRS is using `st_crs()` for vectors or `crs()` for rasters. If one doesn't exist, you can also use those functions to define the CRS.
+
+<br>
+
+# Task 10: Transform your layers to a common CRS
+In the previous exercise, when you ran `st_crs()` and `crs()` you may have noticed that the CRS' were different for the different layers. The raster layer's CRS began with `+proj=longlat` and the vector layer's began with `+proj=utm`. In order to use these layers together in spatial analysis we will want them to have the same CRS.
+
+In this exercise you will transform (sometimes this is called "project") the objects so they share a single CRS. It is generally best to perform spatial analysis with layers that have a projected CRS (and some functions require this). To determine if your object has a projected CRS you can look at the first part of the result from `st_crs()` or `crs()` -- **if it begins with `+proj=longlat` then your CRS is unprojected.**
+
+Note that you will use `method = "ngb"` in your call to `projectRaster()` to prevent distortion in the elevation image.
+
+## Instructions
+
+* Use the `crs()` function with argument `asText = TRUE` on the `aarhus` layer to get the CRS as a string and save this as `the_crs`.
+* Use `st_transform()` to transform the vector `playgrounds` object to the CRS in `the_crs`.
+* Use `projectRaster()` to transform the raster `elevation` object to the CRS in `the_crs`. This will take a few seconds.
+* Use `st_crs()` on `playgrounds` and `elevation` to confirm that they now have the same CRS. They should all have a CRS that starts with `+proj=utm`.* 
+
+```{r crs-assign, eval=FALSE}
+# Get the CRS from the aarhus object
+the_crs <- ___(aarhus, asText = TRUE)
+
+# Project playgrounds to match the CRS of aarhus
+playgrounds_crs <- ___(playgrounds, crs = ___)
+
+# Project elevation to match the CRS of aarhus
+elevation_crs <- ___(elevation, crs = ___, method = "ngb")
+
+# Look at the CRS to see if they match
+___(playgrounds_crs)
+___(elevation_crs)
+
+
+```
+
+## Solution
+```{r crs-assign-sol, echo=TRUE}
+# Get the CRS from the aarhus object
+the_crs <-crs(aarhus, asText = TRUE)
+
+# Project playgrounds to match the CRS of aarhus
+playgrounds_crs <- st_transform(playgrounds, crs = the_crs)
+
+# Project  to match the CRS of aarhus
+elevation_crs <- projectRaster(elevation, crs = the_crs, method = "ngb")
+
+# Look at the CRS to see if they match
+st_crs(playgrounds_crs)
+crs(elevation_crs)
+```
+Great work! This may be the least fun part of spatial analysis but knowing how to do it will save you from a lot of frustration later.
+
+# Task 11: Plot vector and raster together
+If the layers do not share a common CRS they may not align on a plot. To illustrate, in this exercise, you will initially create a plot with the `plot()` function and try to add two layers that do not share the same CRS. You will then transform one layer's CRS to match the other and you will plot this with both the `plot()` function and functions from the `tmap` package.
+
+Note that for this exercise we returned all the layers to their original CRS and did not retain the changes you made in the last exercise.
+
+With the `plot()` function you can plot multiple layers on the same map by calling `plot()` multiple times. You'll need to add the argument `add = TRUE` to all calls to `plot()` after the first one and you need to run the code for all layers at once rather than line-by-line.
+
+Make sure `sf`, `raster` and `tmap` are loaded in your workspace.
+
+## Instructions
+
+* Try to plot the `playgrounds` object on top of the `aarhus` object with `plotRGB(aarhus)` followed by `plot(playgrounds, add = TRUE)`. Do you see the playgrounds? If not, use the `st_transform` to project to shared CRS.
+* Re-run the `plot()` code from the instruction above, color the `playgrounds` green and make the points stand out larger by setting the `lwd` argument to 3. You can also increase the transparency of `aarhus`, by setting its `alpha` at around 100.
+* Run the given `tmap` code. Note that `tm_rgb()` is used for multi-layered raster
+
+```{r plot, eval=FALSE}
+# Plot aarhus and playgrounds (run both lines together)
+# Do you see the playgrounds?
+___(aarhus, stretch = "lin")
+___(playgrounds, add = TRUE)
+
+
+# Simply run the tmap code
+library(tmap)
+tm_shape(aarhus) + 
+    tm_rgb() + 
+    tm_shape(parks) + 
+    tm_polygons(col = "green") +
+    tm_shape(playgrounds_crs) + 
+    tm_dots(col = "yellow",
+              size = 1)
+```
+
+## Solution
+```{r plot-sol, echo=TRUE}
+# Plot aarhus and playgrounds (run both lines together)
+# Do you see the playgrounds?
+plotRGB(aarhus, stretch = "lin", alpha = 100)
+plot(playgrounds_crs, col = "green", lwd = 3, add = TRUE)
+
+# # See if aarhus and playgrounds share a CRS
+# st_crs(playgrounds)
+# crs(aarhus)
+# 
+# # Save the CRS of the aarhus layer
+# the_crs <- crs(aarhus, asText = TRUE)
+# 
+# # Transform the playgrounds CRS to match aarhus
+# playgrounds_crs <- st_transform(playgrounds, crs = the_crs)
+# 
+# # Re-run plotting code (run both lines together)
+# # Do the playgrounds show up now?
+# plot(aarhus);plot(playgrounds_crs, add = TRUE)
+
+# Simply run the tmap code
+library(tmap)
+tm_shape(aarhus) + 
+    tm_rgb() + 
+    tm_shape(parks) + 
+    tm_polygons(col = "green") +
+    tm_shape(playgrounds_crs) + 
+    tm_dots(col = "yellow",
+              size = 1)
+```
+Great work! As you noticed, you mostly can't plot layers together if they don't have the same CRS. You'll see later that there are exceptions but it is definitely best practice to ensure the layers you'll work with have a common, projected CRS.
+
+# Task 12: Loading data from the internet
+
+There are a lot of online resources for spatial data, such as OSM, AirBnB, GoogleMaps, DivaGIS, and GADM database. In the exercise you will learn to work with rasters from the GADM database which contains spatial data - vector and raster  -  for all current countries and is well-integrated with R. You can load the data directly into R with the function getData() and start processing. The available data are:
+
+* SRTM 90 (elevation data with 90m resolution between latitude  -60 and 60)
+* World Climate Data (Tmin, Tmax, Precip, BioClim)
+* Global adm. boundaries (different levels)
+
+In the case of GADM you must also provide the level of administrative subdivision (0=country, 1=first level subdivision)
+
+## Instructions
+* To read elevation with the `getData()` function from GADM, select the following arguments: 
+  - `name` is `alt` for altitude (elevation), 
+  - `country` needs a 3 letter ISO code for Denmark; getData('ISO3') let's you see the codes, 
+  - `mask` needs to be set  to TRUE as we wish to mask surrounding countries. 
+* to read administrative data, choose the following:
+  - `name` is `GADM` for global administrative data, 
+  - `country` needs a 3 letter ISO code for Denmark; getData('ISO3') let's you see the codes, 
+  - `level` should be set to the level of administrative subdivision (0=country border, 1=first level subdivision, eg. Midtjylland region, 2 = municipalities,... ).
+  
+## Examples
+```{r}
+# elevation <- getData("alt", country = "DNK", mask = TRUE)
+# municipalities <- getData("GADM", country = "DNK", level = 2)
+# DK_border <- getData("GADM", country = "DNK", level = 0)
+
+```
+
