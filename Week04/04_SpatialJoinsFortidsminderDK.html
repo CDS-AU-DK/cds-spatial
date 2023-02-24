@@ -1310,7 +1310,7 @@ Fortidsminder</a></h2>
                   <p class="author"><span class="glyphicon glyphicon-user"></span> Adela
 Sobotkova</p>
                         <p class="date"><span class="glyphicon glyphicon-calendar"></span> 06/02/2023
-updated 2023-02-15</p>
+updated 2023-02-24</p>
           </div>
    </div>
      
@@ -1745,25 +1745,20 @@ may take several steps that include <code>sort()</code> and
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Test whether the CRS match</span></span>
 <span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="fu">___</span>(viking_clip) <span class="sc">==</span> <span class="fu">___</span>(nobel)</span>
 <span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute the distance between Nobel and viking_clip</span></span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">___</span>(___, nobel)</span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute the distance between the Nobelparken and the clipped viking monuments</span></span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">________</span>(___________, nobel)</span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Take a quick look at the result</span></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="fu">________</span>(d)</span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Find the index of the 10 nearest viking monuments</span></span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>sorted <span class="ot">&lt;-</span> <span class="fu">sort</span>(d) <span class="co"># sort monuments by proximity</span></span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>nearest10index <span class="ot">&lt;-</span> <span class="fu">which</span> ( __________) <span class="co"># which distances are smaller than the 10th smallest distance</span></span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Identify the viking monuments that are the nearest, what kinds of monuments are they?</span></span>
-<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>viking_clip[_________,]<span class="sc">$</span>anlaegsbet</span>
-<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the results by re-running the plot from exercise 6</span></span></code></pre></div>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute the distance between the Nobelparken and the clipped viking monuments</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">________</span>(___________, nobel)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Take a quick look at the result</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="fu">________</span>(d)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Find the index of the 10 nearest viking monuments</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>sorted <span class="ot">&lt;-</span> <span class="fu">sort</span>(d) <span class="co"># sort monuments by proximity</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>nearest10index <span class="ot">&lt;-</span> <span class="fu">which</span> ( __________) <span class="co"># which distances are smaller than the 10th smallest distance</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Identify the viking monuments that are the nearest, what kinds of monuments are they?</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>viking_clip[_________,]<span class="sc">$</span>anlaegsbet</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the results by re-running the plot from exercise 6</span></span></code></pre></div>
 <div id="solution-3" class="section level3">
 <h3>Solution</h3>
 <p>Nice work! If you look at the result for the last line of code

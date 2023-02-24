@@ -206,11 +206,6 @@ nobel <- ___(___)
 # Test whether the CRS match
 ___(viking_clip) == ___(nobel)
 
-
-# Compute the distance between Nobel and viking_clip
-d <- ___(___, nobel)
-
-
 # Compute the distance between the Nobelparken and the clipped viking monuments
 d <- ________(___________, nobel)
 
