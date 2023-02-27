@@ -1,0 +1,395 @@
+---
+title: "Week 04 - Spatial Joins and Fortidsminder"
+author: "Adela Sobotkova"
+date: "06/02/2023 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(sf)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Danish monuments
+In this task, you will find out which municipality in Denmark has the most Viking-era monuments and finds registered. You will work with spatial data from [Fund og Fortidsminder](https://www.kulturarv.dk/fundogfortidsminder/Download/), namely a shapefile in ETRS89/UTM32N projection that collects information on 300,000 registered monuments.
+
+## Instructions
+
+* Download the fortidsminder archive from [Sciencedata](https://sciencedata.dk/shared/ce0f8e62af16dab66b45f13be90d00f8) and unzip. 
+* Load the anlaeg_all_25832.shp into a `monuments` sf object. It might take couple seconds, because there are 300k of them.
+* Filter the monuments object to those from the Viking-era ("Vikingtid"), creating a `viking` object 
+* Read in the `municipalities` shapefile from GADM database (see Week 03).
+* Project/transform the `municipalities` using the EPSG number 25832 as the target CRS. As the municipalities is a SpatialPolygons Dataframe, you will need to use `st_as_sf()` to convert it to `sf` object first.
+* Plot the monuments (`viking`) on top of the municipalities. You will want to plot only the geometry of the municipalities.
+
+```{r monuments-dk, eval=FALSE}
+
+# Load the monuments into R
+monuments <- read_sf(" _________")
+
+
+# Check the periodisation and type of the monuments
+_____(monuments$datering)
+_____(monuments$anlaegsbet)
+
+# Filter Viking-era finds
+viking <- monuments %>% 
+  _____(___________)
+
+# Prepare municipalities
+library(_______)
+municipalities <-  getData(__________)
+municipalities_25832 <- municipalities %>% 
+  st_as_sf(_______)
+
+
+# Plot the monuments on top of the municipalities
+plot(_________(municipalities_25832))
+plot(_________, add = TRUE, pch = 16, col = "red")
+```
+
+### Solution
+```{r monuments-dk-sol, echo=FALSE}
+# Load the monuments into R
+monuments <- read_sf("../data/anlaeg_all_25832.shp")
+
+# Check the periodisation of the monuments
+unique(monuments$datering)
+unique(monuments$anlaegsbet)
+
+# Filter Viking-era finds
+viking <- monuments %>% 
+  filter(datering == "Vikingetid")
+
+# Prepare municipalities
+library(raster)
+municipalities <-  getData("GADM", country = "DNK", level = 2)
+municipalities_25832 <- municipalities %>% 
+  st_as_sf() %>% 
+  st_transform(crs = 25832)
+
+
+# Plot the monuments on top of the municipalities
+plot(st_geometry(municipalities_25832))
+#plot(viking, add = TRUE, pch = 16, col = "red")
+plot(viking["anlaegsbet"], add = TRUE)
+
+```
+
+Great! The monuments object did not have municipality information until you performed the spatial join with `st_join()`. Now that the municipality information is included you can supply each municipality office with the count and coordinates of monuments they are in charge of so they can monitor and safeguard.
+
+
+
+# Task 2: Spatial joins - monuments and municipalities
+For many analysis types you need to link geographies spatially. For example, you want to know how many Viking-era cultural monuments/artefacts (fortidsminder) are in each municipality but you don't have a municipality attribute in the data. The best way to do this is with a spatial join using `st_join()`.
+
+Importantly, the `st_join()` function requires `sf` data frames as input and will not accept an object that is just `sf` geometry. You can use the `st_sf()` function to convert `sf` geometry objects to an sf data frame (`st_sf()` is essentially the opposite of `st_geometry()`).
+
+## Instructions
+
+* Use `class()` to see if the `viking` object has class `data.frame` or if it's just geometry.
+* Use `st_join()` to conduct a spatial join in order to add municipality information to the `viking` object.
+* Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`NAME_2`).
+* What five municipalities contain the most monuments? Which have the least and why? 
+* Challenge: can you plot those five municipalities that contain the fewest viking finds on a map of Denmark? You can use the `st_intersect()` function and select municipalities which satisfy the intersection with fewest finds. Alternatively, use `filter()` to plot the municipalities that you computed in the `least` object.
+
+```{r monuments-munic, eval=FALSE}
+# Determine whether viking monuments has class data.frame
+class(viking)
+
+# Join the viking monuments with the municipalities
+viking_neigh <- ________(viking, municipalities_25832)
+
+# Confirm that viking_neigh has the municipality information
+head(viking_neigh)
+
+# Calculate the count of monuments per municipality
+viking_neigh %>% 
+  group_by(________) %>% 
+  tally() %>% 
+  arrange(____(__)) 
+
+# Create an object with 5 of the least populated municipalities
+least <- viking_neigh %>% 
+  group_by(________) %>% 
+  tally() %>% 
+  arrange(__) %>%
+  _____(1:5)
+  
+  
+# Plot the municipalities with fewest Viking finds in red over DK municipalities
+plot(__________, col = "grey", border = "white")
+plot(municipalities_25832[_________(___________(least, municipalities_25832, sparse = FALSE)), ]$geometry, col = "red", add = T) 
+
+```
+
+### Solution
+```{r monuments-munic-sol, echo=FALSE}
+# Determine whether viking monuments has class data.frame
+class(viking)
+
+# Join the viking monuments with the municipalities
+viking_neigh <- st_join(viking, municipalities_25832)
+
+# Confirm that viking_neigh has the municipality information
+head(viking_neigh)
+
+# Calculate the count of monuments per municipality
+viking_neigh %>% 
+  group_by(NAME_2) %>% 
+  tally() %>% arrange(desc(n)) 
+
+# Create an object the least populated municipalities
+least <- viking_neigh %>% 
+  group_by(NAME_2) %>% 
+  tally() %>% arrange(n) %>% slice(1:5)
+  
+# Plot the municipalities with fewest VIkind finds  red
+plot(municipalities_25832$geometry, col = "grey", border = "white")
+plot(municipalities_25832[which(st_intersects(least, municipalities_25832, sparse = FALSE)), ]$geometry, col = "red", add = T) 
+
+```
+
+Great! The monuments object did not have municipality information until you performed the spatial join with `st_join()`. Now that the municipality information is included you can supply each municipality office with the count and coordinates of monuments they are in charge of so they can monitor and safeguard.
+
+# Task 3: Spatial relationships
+In the previous exercise, you loaded all monuments across Denmark. In this exercise you need to make a plan for family visit. Your family like to bike in green areas and visit Viking monuments, so calculate:
+
+*a) how many viking monuments are within 10000 m radius of Nobelparken and 
+*b) how many parks are completely within this area as well.  
+
+To achieve this, you will need to repeat a routine from Week 03, namely, create the Nobelparken point [10.2033485,56.174346] and a buffer of 10000m around it in a reasonable projection. Then use `st_intersects()` to tally the monuments within 10000m radius  and `st_contains()` to determine how many parks are *completely* within the buffer. You will then use the `st_intersection()` function (notice the slight difference in function name!) to **clip** the monuments and parks to the buffer.
+
+A note about the output of functions that test relationships between two sets of features. The output of these and related functions is a special kind of list (with the class `sgbp`). For example, when using `st_intersects()`, the first element in the output can be accessed using `[[1]]`, which shows features from the monuments object that intersect with the buffer polygon. Likewise, `[[2]]` would show the buffer polygons that intersect with the monuments.
+
+## Instructions
+
+* Load `viking` and `parks` objects and verify consistent projection with `df_sf`
+* Create a point at Nobelparken from these coordinates [10.2033485,56.174346] and create a 10000m buffer `nb_buf` around the point. What do you think is the native CRS of these coordinates?  Remember that there is something you will need to do before buffering!
+* Use `st_intersects()` to identify `viking` that intersect with the buffer object (`nobel_buf`) and call the result `viking_int`.
+* Use `st_contains()` to identify `parks` features that are completely within the buffer object (`buf`) and call the result `parks_cont`.
+* Extract `viking` and `parks` that intersect and are contained by  `nobel_buf` and save as `int` and `cont`. You should extract the first element of the `int` and `cont` object to be able to get the names of the viking monuments thereafter.
+* Use the `int` object you just created to identify the IDs of the monuments that intersect with buffer (the first viking monument will be Jordfæstegrav).
+* Use `st_intersection()` to "clip" the monuments by `nobel_buf` and call this `viking_clip`. Do the same with parks. 
+* Plot the result
+
+```{r intersect, eval=FALSE}
+# Load objects
+parks
+viking
+
+
+# Create a 10km buffer around Nobelparken (see Week 03 Task 01 for guidance) 
+nb <- data.frame(________, _________, ________)
+nb_buf <- nb %>% 
+  st_as_sf(________________, crs = _____) %>% 
+  ______________ %>% 
+  st_buffer(10000)
+
+
+# Check consistent projection among the objects
+________==_________
+________==_________
+
+# Identify viking monuments that intersect with the buffer
+viking_int <- ___(nb_buf, viking)
+
+# Identify parks contained by the buffer
+parks_cont <- ___(nb_buf, parks)
+
+# Get the indexes of the viking monuments and parks contained by the buffer. You are extracting the first element of each list.
+int <- viking_int[[___]]
+cont <- parks_cont[[___]]
+
+# Get the IDs or codes of the viking and parks in buffer
+viking$stednavn[____]
+parks$navn[___]
+
+# Clip the viking monuments and parks layers by the buffer (ignore the warning)
+viking_clip <- ___
+parks_clip <- ___
+
+# Plot the geometry of the clipped viking monuments
+plot(nb_buf$geometry[1,], border = "blue")
+plot(parks[cont,], add = TRUE, col = "yellow")
+plot(st_geometry(viking_clip), col = "red", add = TRUE, pch = 19)
+
+```
+
+### Solution
+```{r intersect-sol, echo = FALSE}
+# Load parks
+parks <- read_sf("../data/parks.shp")
+
+# Create a 10km buffer around Nobelparken 
+nb <- data.frame(name = "Nobel", long = 10.2033485,lat = 56.174346)
+nb_buf <- nb %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  st_transform(25832) %>% 
+  st_buffer(10000)
+
+# Check alignment and reproject viking monuments if needed
+st_crs(viking)== st_crs(parks)
+st_crs(nb_buf)==st_crs(parks)
+#plot(parks$geometry);plot(nb_buf, add =T)
+
+# Identify viking monuments that intersect with the buffer
+viking_int <- st_intersects(nb_buf, viking)
+
+# Identify parks contained by the buffer
+parks_cont <- st_contains(nb_buf, parks)
+
+# Get the indeces of viking and parks which respectively intersect and are contained by the buffer
+int <- viking_int[[1]]  # 79
+cont <- parks_cont[[1]]  #32
+
+# How many and what categories of viking monuments are within the buffer?
+unique(viking$stednavnsb[int])
+
+# How many parks and what are their names? 
+viking$anlaegsbet[int]
+parks$navn[cont]
+
+# Clip the monument and parks layer constrained by the buffer
+viking_clip <- st_intersection(nb_buf, viking)
+parks_clip <- parks %>% 
+  slice(cont)
+
+# Plot the geometry of the clipped viking
+plot(nb_buf$geometry, border = "blue")
+plot(st_geometry(parks[cont,]), add = TRUE, col = "aquamarine", border = "grey")
+plot(viking_clip$geometry, add = TRUE, col = "red", pch = 4)
+```
+
+#### Questions: 
+
+1. What is the class of the object produced via `st_intersects()`?
+2. Why do we use `parks[cont,]` to view the fully contained parks in the buffer plot?
+3. How many parks and viking monuments respectively are there within the buffer?
+
+The `sf` package has a lot of different functions for determining relationships. Some are easy to conflate!  You have just used `st_intersects()` and `st_contains()` here but there are others as well and what you use will depend on what relationships you're looking at. In this exercise you also used the important `st_intersection()` function to clip one layer based on another.
+
+# Task 4: Measuring distance between features
+Of course, measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs.
+
+In this exercise you'll measure the distance from the Nobelparken to the viking monuments within the 10km buffer and identify the 10 closest ones.
+
+## Instructions
+
+* Check that your Nobelparken POINT feature is in a planar CRS. [Hint: You can regenerate the Nobelparken point from coordinates or extract if from the `nb_buf` with `st_centroid()`]
+* Test whether the CRS of `cities` matches the CRS of `viking_clip` with `st_crs()`.
+* Use `st_distance()` to compute the distance between Nobelparken to the viking monuments within the 10km buffer .
+* Use `head()` to take a quick look at the result.
+* Identify the index of the 10 sites with the smallest distance. This may take several steps that include `sort()` and `which()` functions.
+* Use `nearest10` to pull out the rows from `viking` of the nearest viking monument (see the `anlaegsbet` variable).
+
+```{r nearest, eval=FALSE}
+# Create the nobel object and transform to planar CRS
+nobel <- ___(___)
+
+# Test whether the CRS match
+___(viking_clip) == ___(nobel)
+
+# Compute the distance between the Nobelparken and the clipped viking monuments
+d <- ________(___________, nobel)
+
+# Take a quick look at the result
+________(d)
+
+# Find the index of the 10 nearest viking monuments
+sorted <- sort(d) # sort monuments by proximity
+nearest10index <- which ( __________) # which distances are smaller than the 10th smallest distance
+
+# Identify the viking monuments that are the nearest, what kinds of monuments are they?
+viking_clip[_________,]$anlaegsbet
+
+# Plot the results by re-running the plot from exercise 6
+```
+
+### Solution
+```{r nearest-sol, include=FALSE}
+# Get in the nobel object and viking_clip
+nobel <- st_centroid(nb_buf)
+
+# Test whether the CRS match
+st_crs(viking_clip) == st_crs(nobel)
+
+
+# Compute the distance between the Nobelparken and the clipped viking monuments
+d <- st_distance(viking_clip, nobel)
+
+# Take a quick look at the result
+head(d)
+
+# Find the index of the 10 nearest viking monuments
+#nearest <- which.min(d)
+sorted <- sort(d)
+nearest10index <- which(d<=sorted[10])
+
+
+# Identify the viking monuments that are the nearest
+viking_clip[nearest10index,]$anlaegsbet
+#viking[nearest10index,]$geometry
+
+# Plot the results by re-running the plot from exercise 6
+plot(nb_buf$geometry, border = "blue")
+plot(st_geometry(parks[cont,]), add = TRUE, col = "aquamarine", border = "grey")
+plot(viking_clip[nearest10index,]$geometry, add = TRUE, col = "red", pch = 4)
+```
+
+Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)
+
+# Task 5: Map of Danish municipalities and monuments
+
+Let us now recap some of the functionality we have learnt in the previous two weeks. Going back to classification and mapping tasks, can you summarize information and create a chloropleth map of the Danish municipalities showing the varied densities of a single type of cultural heritage (not-vikind-tid, this time) per kommune? 
+
+## Instructions
+
+* load `tmap` package
+* filter the `monuments` dataset choosing a *single type* (either monuments of a particular era or a type) of monument for display to make the map more leightweight.
+* join your target monument with the `municipalities` data and summarize them appropriately
+* create a chloropleth map of Danish municipalities showing the density of the target monuments in a meaningful way. 
+* create a second map zooming to the Aarhus municipality and showing the locations of target monuments there as points (Hint: you may need to use a bounding box)
+* display the two maps side-by-side
+* *Challenge: can you show the 3 monuments that are the closest to Nobelparken in your detailed map?*
+
+
+```{r}
+# /Start Code/ #
+A <- municipalities_25832 %>% filter(NAME_2 == "Århus")
+library(tmap)
+# tm_shape(municipalities_25832) +
+#   tm_borders(col = "grey") +
+tm_shape(A) + 
+  tm_polygons(col = "lightblue") + 
+  tm_shape(parks) +
+  tm_polygons(fill = "green")+
+  tm_shape(viking)+
+  tm_dots(col= "anlaeg_simple")
+
+head(viking)
+unique(viking$anlaegstyp)
+viking$anlaeg_simple <- str_extract(viking$anlaegstyp,"^\\d{3}")
+# /End Code/ #
+```
+
+
+#### Questions:
+
+4. What monument type did you choose to depict and what is its density per square km in Aarhus municipality? 
+5. What kind of classification method did you choose for your map of municipalities and why?
