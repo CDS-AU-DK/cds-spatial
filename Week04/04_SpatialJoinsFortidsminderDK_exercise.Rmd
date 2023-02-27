@@ -129,7 +129,7 @@ A note about the output of functions that test relationships between two sets of
 * Use `st_intersects()` to identify `viking` that intersect with the buffer object (`nobel_buf`) and call the result `viking_int`.
 * Use `st_contains()` to identify `parks` features that are completely within the buffer object (`buf`) and call the result `parks_cont`.
 * Extract `viking` and parks that intersect and are contained by  `nobel_buf` and save as `int` and `cont`.
-* Use the `int` object you just created to identify the IDs of the monuments that intersect with buffer (the first will be XXXX).
+* Use the `int` object you just created to identify the IDs of the monuments that intersect with buffer (the first viking monument will be Jordfæstegrav).
 * Use `st_intersection()` to "clip" the monuments by `nobel_buf` and call this `viking_clip`. Do the same with parks. 
 * Plot the result
 
@@ -170,7 +170,7 @@ viking_clip <- ___
 parks_clip <- ___
 
 # Plot the geometry of the clipped viking monuments
-plot(nb_buf$geometry[1,], border = "blue")
+plot(nb_buf$geometry, border = "blue")
 plot(parks[cont,], add = TRUE, col = "yellow")
 plot(st_geometry(viking_clip), col = "red", add = TRUE, pch = 19)
 
@@ -230,7 +230,7 @@ Let us now recap some of the functionality we have learnt in the previous two we
 ## Instructions
 
 * load `tmap` package
-* filter the `monuments` dataset choosing a *single type* (either monuments of a particular era or a type) of monument for display to make the map more leightweight.
+* filter the `monuments` dataset choosing a *single type* (either monuments of a particular era or a type) of monument for display to make the map more leight-weight.
 * join your target monument with the `municipalities` data and summarize them appropriately
 * create a chloropleth map of Danish municipalities showing the density of the target monuments in a meaningful way. 
 * create a second map zooming to the Aarhus municipality and showing the locations of target monuments there as points (Hint: you may need to use a bounding box)
