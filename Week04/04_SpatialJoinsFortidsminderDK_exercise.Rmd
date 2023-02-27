@@ -78,7 +78,7 @@ Importantly, the `st_join()` function requires `sf` data frames as input and wil
 * Use `st_join()` to conduct a spatial join in order to add municipality information to the `viking` object.
 * Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`NAME_2`).
 * What five municipalities contain the most monuments? Which have the least and why? 
-* Challenge: can you plot those five municipalities that contain the fewest viking finds on a map of Denmark? You can use the `st_intersect()` function and select municipalities which satisfy the intersection with fewest finds. 
+* Challenge: can you plot those five municipalities that contain the fewest viking finds on a map of Denmark? You can use the `st_intersect()` function and select municipalities which satisfy the intersection with fewest finds. Alternatively, use `filter()` to plot the municipalities that you computed in the `least` object.
 
 ```{r monuments-munic, eval=FALSE}
 # Determine whether viking monuments has class data.frame
@@ -157,8 +157,7 @@ viking_int <- ___(nb_buf, viking)
 # Identify parks contained by the buffer
 parks_cont <- ___(nb_buf, parks)
 
-# Get the indexes of which viking monuments intersect and which units 
-# are contained by the buffer
+# Get the indexes of the viking monuments and parks contained by the buffer. You are extracting the first element of each list.
 int <- viking_int[[___]]
 cont <- parks_cont[[___]]
 
