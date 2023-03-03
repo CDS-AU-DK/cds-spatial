@@ -1,0 +1,231 @@
+---
+title: "Week 05 - Distances"
+author: "Adela Sobotkova"
+date: "1-March-2023 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+Measuring distance between feature sets is a component of spatial analysis 101 -- a core skill for any analyst. There are several functions in `base` R as well as in the packages `rgeos` and `geosphere` to compute distances, but the `st_distance()` function from `sf` provides a useful feature-to-feature distance matrix as output and can be used for most distance calculation needs, including Euclidian and geodetic distances.
+
+In this exercise you will :
+
+* explore different as-the-crow-flies *geodetic* distance measurements for the Aarhus to Sydney route with `geosphere` package
+* compare the *geodetic* to *Euclidian* distances for the Aarhus to Sydney route with `sf` package
+* create the *Euclidian* distance matrix from the Nobelparken to the Viking monuments within the Aarhus municipality (optional)
+
+Let's practice measuring distances between different spatial objects! 
+
+# Task 1: Geodetic distances between Aarhus and Sydney
+
+Shortest distance between two points can mean a lot of different things. Here we explore as-the-crow-flies/geodetic distances between two points defined with latitude and longitude (geographic coordinates) and compare the implications of using different datums (shapes of earth). A number of different calculations are available via the Haversine, Law of Cosines, Meeus and other functions in the `geosphere` package. Their strengths and weaknesses are described in [this communication](https://cs.nyu.edu/visual/home/proj/tiger/gisfaq.html)
+
+Note: If you are using Google Maps, several of these functions are now provided in the Google Maps API V3 ‘spherical’ library (c`omputeDistanceBetween()`, `computeHeading()`, `computeOffset()`, `interpolate()`, etc; note they use a default Earth radius of 6,378,137 meters).
+
+## Instructions
+* First, install and load the `geosphere` package. It contains a number of functions for geodetic distance measurement.
+* Second, create a matrix for Aarhus and Sydney longitude and latitude with the `matrix()` function. Geosphere requires either a spatial object (not a simple feature!) or a matrix of angular coordinates to calculate distances.
+  -   Aarhus University coordinates are [10.212030,56.158150] and Sydney Opera house coordinates are [151.215256,-33.856159]
+  -   Label the `my_points` columns and rows
+  -   Verify that you got the data in correctly
+* Run the different functions and observe the differences between their outputs. Which one provides the shortest and longest measurement? By what percentage and why?
+
+### Prepare data 
+```{r }
+# Install & load geosphere
+# install.packages("geosphere")                
+library("geosphere")
+
+
+# Create spatial data matrix
+my_points <- matrix(c(10.212030, 151.215256,56.158150, -33.856159), nrow = 2)
+rownames(my_points) <- c("Aarhus University", "Sydney operahouse")
+colnames(my_points) <- c("longitude", "latitude")
+
+# Check the object
+my_points
+```
+### Great Circle using Haversine distance
+
+Haversine method assumes a spherical earth, ignoring ellipsoidal effects (flattening of the poles). It has been used to calculate great circle distances on a sphere since 1984, when computers did not have the 15 digits precision as today.
+```{r haver}
+# Calculate Haversine distance
+distHaversine(my_points)  # result is in meters
+?distHaversine()
+```
+
+### Law of Cosines distance
+Probably the fastest of the three approaches and performs relatively well for distances above 1 arc minute.  Has precision of 15 digits.
+```{r lcos}
+# Calculate Law of Cosines distance
+distCosine(my_points)  
+```
+
+### Meeus distance
+```{r meeus}
+ # Calculate Meeus distance
+distMeeus(my_points)                        
+```
+
+### Rhumb line
+
+A ‘rhumb line’ (or loxodrome) is a path of constant bearing, which crosses all meridians at the same angle.
+Sailors used to (and sometimes still) navigate along rhumb lines since it is easier to follow a constant compass bearing than to be continually adjusting the bearing, as is needed to follow a great circle. Rhumb lines are straight lines on a Mercator Projection map (also helpful for navigation).
+```{r rhumb}
+distRhumb(my_points)  
+```
+
+### Vincenty ellipsoid distance
+Highest precision approach for exact (highly precise) coordinates. It is an iterative approach that take substantially more computation time than the former two methods, and has precision up to 0.5 mm. If you are measuring the movement of continents, this is the one to use.
+```{r vinc}
+# Calculate Vincenty sphere distance
+distVincentySphere(my_points) 
+# Calculate Vincenty ellipsoid distance
+distVincentyEllipsoid(my_points) 
+```
+
+## What's the difference?
+Which of the functions provide the shortest and longest measurement? By what percentage and why?
+
+```{r diff}
+# Calculate the difference in km
+
+# Calculate percent difference
+```
+
+##  Sidenote: When is it NOT okay to assume the Earth is a sphere?
+
+A quick (?) test is: Compare the results produced by using the two
+extreme values of the radius of curvature for the Earth:
+
+* minimum radius of curvature: 6336 km (3937 mi)
+* maximum radius of curvature: 6399 km (3976 mi)
+
+in your application. If the results are different enough to cause you
+to change your action (or your recommendation, or your interpretation
+of the implication of the results, etc.), then assuming the Earth is
+spherical is NOT okay.
+
+
+# Task 2: Euclidian distances between Aarhus and Sydney
+
+Let us now generate Euclidian distances for the Aarhus to Sydney route, and compare with the geodetic ones. `st_distance()` function lets you calculate both types of distances, depending on what data you provide - lat/long or Easting/Northing. Let's remember that Euclidian distance assumes flat earth, so we will need to adjust - project - the lat/long coordinates into a plane (2D).   
+
+## Instructions 
+
+* We will reuse the Aarhus and Sydney coordinates, this time loading them into a dataframe. 
+* Convert the `points` df into a simple feature and project to 2D space. You can try either the Danish UTM or Australian GDA EPSG. 
+* Calculate Euclidian distance with `st_distance()`, supplying the two rows of `points` as origin and distance arguments. 
+* *What is the difference in the Euclidian and geodetic distance on the route Aarhus to Sydney?*
+```{r points, eval =FALSE}
+# load sf library
+library(sf)
+library(tidyverse)
+
+# prepare data as a simple feature
+points <- data.frame(names =c("Aarhus University", "Sydney operahouse"), 
+                        longitude = c(________,_________),
+                        latitude = c(________,_________))
+
+# create geographic simple feature
+points_4326 <- points %>% 
+  ________(coords = c("longitude", "latitude"), crs = ________) 
+
+# create a planimetric simple feature
+points_32632 <- points %>% 
+  ________(coords = c("longitude", "latitude"), crs = ________) %>% 
+  st_transform(________)
+
+
+# calculate the Euclidian distance
+euc_dist <- st_distance(________[1,],________[2,])
+
+# calculate geodetic distance
+geo_dist <- st_distance(________[1,],________[2,])
+
+# difference
+euc_dist-geo_dist 
+(eu_dist-geo_dist)/geo_dist*100  
+```
+
+
+The difference between Euclidian and geodetic distances is non-negligible especially at large-scale. In the case of Aarhus to Sydney route the difference ranges from 20 - 36% depending on which geodetic measurement method you use. That would significantly impact flight path planning if you were a traffic officer at the Aarhus airport. 
+
+# Task 3: Euclidian distances to Viking-era monuments in Aarhus
+
+*A variant of this exercise originally appeared in Week 04:Task 4. Do it if you did not manage last week. We are only looking at the result*
+
+In this exercise you will calculate Euclidian distances between Nobelparken and Viking-era monuments within the Aarhus municipality. You will need the `viking`, `nobelparken` and Danish municipalities objects from tasks 1 and 3 in Week 04 exercise.
+
+Hopefully you have saved the `viking` object from last week locally with `writeRDS()` or `st_write()` so as to avoid regenerating it. It is always a good idea to route around tedious steps (such as loading large objects) by saving your interim products in output_data/ folder. 
+
+If not, no worries, you can regenerate! Go back to Task 1 and 3 of Week 04 and repeat the steps to have a sf object of Viking-period monuments in Denmark in ETRS89/UTM32N projection that also contains municipality information.
+
+## Viking-period monuments for Aarhus municipality
+
+* Load the `viking` monuments object
+* Filter the `viking` object to only those within the Aarhus municipality. You can do this either by 
+
+--    a) filtering on the municipality column (which you will have if you have done the spatial join `st_join()` the `viking` to `municipalities_tf`)
+--    b) clipping the `viking` object by the Aarhus municipality geometry form `municipalities_tf` object with `st_intersection()`
+* Use `head()` to confirm that the new object has municipality information -- for example, it should now have municipality name (`NAME_2`).
+
+
+## Distance matrix between monuments and Nobelparkens 
+
+* Reuse or regenerate your Nobelparken location (either filter out of `df_sf` POINT feature from Week 3 and project to a planar CRS, or reuse object from Week 4). 
+* Test whether the CRS of `nobel` matches the CRS of the `viking_aarhus` with `st_crs()`. If not, reconcile them!
+* Use `st_distance()` to compute the distance between Nobelparken and the Viking monuments in Aarhus municipality.
+* Use `head()` to take a quick look at the result.
+* Identify the index of the 10 sites with the smallest distance. This may take several steps that include `sort()` and `which()` functions.
+* Use `nearest10` to pull out the rows from `viking` of the nearest Viking monument (see the `anlaegsbet` variable).
+
+```{r, eval = FALSE}
+# Load the viking dataset
+viking_aarhus <- readRDS("../data/viking.rds")
+
+# Read in the nobel object and reconcile crs
+nobel <- st_transform(df_sf[3,], crs = 25832)
+
+# Test whether the CRS match
+st_crs(viking_aarhus) == st_crs(nobel)
+
+# Compute the distance between the Nobelparken and the clipped viking monuments
+d <- st_distance(viking_aarhus, nobel)
+
+# Take a quick look at the result
+head(d)
+
+# Find the index of the 10 nearest viking monuments
+#nearest <- which.min(d)
+sorted <- sort(d)
+nearest10index <- which(d<=sorted[10])
+
+# Identify the viking monuments that are the nearest
+viking_aarhus[nearest10index,]$anlaegsbet
+#viking[nearest10index,]$geometry
+
+# Plot the results
+plot(nb_buf$geometry, border = "blue")
+plot(viking_aarhus[nearest10index,]$geometry, add = TRUE, col = "red", pch = 4)
+```
+
+Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take a long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That is the case of the ancient Roman cities and inscriptions, which you can find in Week 04 homework :)
+

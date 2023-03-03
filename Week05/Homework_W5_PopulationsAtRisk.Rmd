@@ -1,0 +1,242 @@
+---
+title: "Week 05 - Assessing Populations at Risk"
+author: "Adela Sobotkova"
+date: "16-February-2022 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(sf)
+library(mapboxapi)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+## Task 3: Assessing Risk with Demographic data
+This script continues on 05_NetworkDistancesDK.Rmd and should be run in sequence.
+
+There are also individuals with disabilities, the elderly, or others requiring accessible transport, who do not have access to a car. Getting to these hospital sites may prove difficult in areas outside the isochrones. Within large cities, this problem may be solved with public transport, such as the letbanen in Aarhus. Accessibility may also be less of an issue in areas where car ownership is widespread. We can analyze this additional variable with demographic data, also obtained within R.
+
+### Wrangle data from DS
+In the next exercise, you will find out which kommunes face the problem of having lots of high-risk households, where there is a no car, and they are outside the isochrones and in rural areas (out of the reach of public transport)
+
+Number of households without cars are available via Danmark Statistik via the  "Familiernes bilrådighed (faktiske tal) efter rådighedsmønster, område" dataset. The "familier uden biler" sits in csv format as a no_cars.csv with the numbers corresponding to 2020 and 2021 respectively. Overall, there were 1178935 households without a car in 2020 and 1166668 in 2021. The number of course drops with time, while number of car-owning households go up steadily from 1,896,387 in 2020 to 1,929,511 in 2021
+
+* Load the dataset
+* rename the V3 and V4 column to nc2020 and nc2021. (In the provided dataset the numeric columns are number of carless households in year 2020 and in 2021
+```{r more-data, eval = FALSE}
+no_cars <- _________("../data/no_cars.csv", header = FALSE)
+names___________ <- c("municipality","nc2020", "nc2021") 
+```
+
+```{r more-data-sol, echo = FALSE}
+no_cars <- read.csv("../data/no_cars.csv", header = FALSE)
+names(no_cars)[2:4] <- c("municipality","nc2020", "nc2021") 
+```
+It would be nice to know the percentage of households without a car
+Next, get municipalities of Midtjylland and join up with the no_cars attributes, selecting which kommunes have the least cars and are therefore most at risk.
+
+### Percentages of inhabitants without a car per municipality
+Create a simple feature or spatial polygons dataset that contains information on the percentage of households that do not have access to a car.
+
+* First read in the type and count of households ("husstande-og-familier") from 2020 and 2021 from [DS](https://www.dst.dk/en/Statistik/emner/borgere/husstande-familier-og-boern/husstande-og-familier) . Beware that the dataset has no headers, and read.csv() might perform better than tidyverse counterpart.
+* Summarize the `hh` object after grouping by municipality to get a sum of households per kommune. Rename the resulting columns to municipality and households and label the object `hh_mun`
+* Join the  `hh_mun` to  `no_cars` object by the shared municipality column with `inner_join()`. Look up the function to know how exactly to specify the shared columns.
+* In the resulting `hh_nocar` object, create two new columns where you calculate the percentage of carless househols for 2020 and 2021, using the total household count and the nc2020 and nc2021 columns.
+* Load population data by municipality into `pop` object in order to compare and contrast with households. How many people on average per household?
+ 
+-- You can either use the provided file (population by municipality from the first quarter of 2022) called `munic_pop_2022Q1.csv` or, 
+-- Concoct your own dataset (you can further break it down by sex or age) from https://www.statbank.dk/FOLK1A 
+
+* Load municipality data either via `getData()` or from a saved object from Week03
+* Create `no_cars_pct_mun` object by joining the households with no car `hh_nocar` object to the municipalities with `inner_join()`. Beware to preserve the spatial dimension of the `munic` for later use in a map. Look up the function to know how exactly to specify the shared columns. You may also want to rename the `pop` columns first so they are easier to map to `munic` 
+
+```{r households-mun-nocars, eval = FALSE}
+# Load tidyverse
+library(tidyverse)
+
+# load household data
+hh <- read.csv2("../data/households2020_2021.csv", header = FALSE)
+
+# create a summary of households per municipality
+hh_mun <- hh %>% 
+  group_by(_____) %>% 
+  summarize(sum=sum(____)) %>% 
+  rename(municipality = V2, households = sum)
+
+# check total households
+sum(hh_mun$households)
+
+# join households to no_car dataset and calculate percentages
+hh_nocar <- hh_mun %>% inner_join(no_cars, by = "municipality") 
+hh_nocar <- hh_nocar %>% 
+  mutate(nc2020pct = _______/households*100, 
+         nc2021pct = _______/households*100)
+
+# load population (not necessary, I just want to see)
+pop <-  read.csv2("../data/munic_pop_2022Q1.csv", sep = ",", skip = 2)
+
+names(pop)[1] <- "Name"
+names(pop)[2] <- "Pop22"
+sum(pop$Pop22)
+
+# load municipalities
+________
+
+# join municipalities with the carless households dataset
+
+no_cars_pct_mun  <-  munic %>% dplyr::inner_join(hh_nocar, by = c("NAME_2"="municipality")) # this preserves the spatial dimension!
+
+```
+
+```{r households-mun-nocars-sol, echo = FALSE}
+# Load tidyverse
+library(tidyverse)
+
+# load household data
+hh <- read.csv2("../data/households2020_2021.csv", header = FALSE)
+
+# create a summary of households per municipality
+hh_mun <- hh %>% 
+  group_by(V2) %>% 
+  summarize(sum=sum(V3)) %>% 
+  rename(municipality = V2, households = sum)
+
+# check total households
+sum(hh_mun$households)
+
+# join households to no_car dataset and calculate percentages
+hh_nocar <- hh_mun %>% inner_join(no_cars, by = "municipality") 
+hh_nocar <- hh_nocar %>% 
+  mutate(nc2020pct = nc2020/households*100, 
+         nc2021pct = nc2021/households*100)
+
+# load population (not necessary, I just want to see)
+pop <-  read.csv2("../data/munic_pop_2022Q1.csv", sep = ",", skip = 2)
+
+names(pop)[1] <- "Name"
+names(pop)[2] <- "Pop22"
+sum(pop$Pop22)
+
+
+# load municipalities
+library(sf)
+munic <- readRDS("../data/gadm36_DNK_2_sp.rds")
+munic <- as(munic, "sf")
+
+
+# join municipalities with the carless households dataset
+
+# no_cars_pct_mun <- hh_nocar %>% dplyr::inner_join(munic, by = c("municipality" = "NAME_2")) # this will eliminate the spatial dimension!
+no_cars_pct_mun  <-  munic %>% dplyr::inner_join(hh_nocar, by = c("NAME_2"="municipality")) # this preserves the spatial dimension!
+
+```
+
+
+* Create a thematic map of `no_cars_pct_mun` by filtering municipalities that have 25+ percent of households without a car. I recommend `mapview()`, but you are free to use your favorite library.  Mapview usually works well at the end of tidyverse pipeline but as it may interfere with other libraries, I recommend saving the script and upon restart, running only the `mapview()` code chunk so as to avoid interference. 
+* *Which areas in Midtjylland have 25 and more percent of carless households?*
+
+```{r thematic-map-sol, echo = FALSE}
+
+# see if your join worked
+library(mapview)
+library(leaflet)
+no_cars_pct_mun %>% 
+  dplyr::filter(nc2021pct >= 25) %>% 
+  mapview(zcol = "nc2021pct")
+
+```
+
+Now of course, you have the whole situation in Denmark. In the next steps, you need to constrain the municipalities with carless households spatially to those in Midtjylland and check the overlap with hospital isochrones, taking the area outside these isochrones with `st_difference()`.
+
+```{r thematic-map-Midt}
+## YOUR CODE HERE
+```
+
+```{r thematic-map-Midt-sol}
+#region <- getData(country = "DNK", level = 1)
+region <- readRDS("../data/gadm36_DNK_1_sp.rds")
+
+# select Midtjylland
+Midt <- region %>% 
+  as("sf") %>% 
+  filter(VARNAME_1 == "Central Jutland")
+
+# intersect with municipalities
+no_cars_pct_midt <- no_cars_pct_mun %>% 
+  st_simplify(dTolerance = 100) %>% # Let's reduce the weight
+ # st_transform(4326) %>% 
+  st_intersection(Midt$geometry)
+
+# quick look that we got the right area
+library(mapview)
+
+no_cars_pct_midt %>% 
+  mapview(zcol = "nc2021pct")
+```
+Gosh, that was a ton of wrangling! But we are nearly there! :)
+
+
+## Spatial overlay with sf
+
+Spatial overlay is a very common operation when working with spatial data. It can be used to determine which features in one spatial layer overlap with another spatial layer, or extract data from a layer based on geographic information. In R, spatial overlay can be integrated directly into tidyverse-style data analysis pipelines using functions in sf. In our example, we want to determine the areas in Midtjylland with the greatest proportion of households without access to a car that also are beyond a 20 minute walk/cycling route from a hospital.
+
+To do this, follow these steps:
+
+* doublecheck that the coordinate reference system of the `no_car_pct_midt` dataset is 4326, the same CRS used by the isochrones;
+* extract only those municipalities with a percentage of households without cars of 25 percent or above;
+* use the `st_difference()` function to “cut out” areas from those municipalities that overlap the 20-minute cycling isochrones. (Union the isochrones first for neater output).
+* Once you complete this operation, visualize the result in your Mapbox map.
+
+
+```{r risk-areas}
+## YOUR CODE HERE
+```
+
+```{r risk-areas-sol, echo = FALSE}
+## Suggested progress
+
+cycling_isos <- readRDS("../data/cycling_isos.rds")
+
+target_areas <- no_cars_pct_midt %>%
+  #st_transform(4326) %>%
+  filter(nc2021pct >= 25) %>%
+  st_difference(
+    st_union(cycling_isos)
+  )
+
+library(mapboxapi)
+
+mapbox_map <- leaflet() %>%
+  addMapboxTiles(style_id = "streets-v11",
+                 username = "mapbox") 
+
+mapbox_map %>%
+  addPolygons(data = target_areas)
+```
+
+### Questions:
+
+*3. Are there any areas that are located beyond a 20-minute bike-ride of a hospital that have proportionally lower access to cars? Where are they and what is their total area?*
+
+*4. How would you ensure residents in these areas have reasonable access to hospitals?*
+
+```{r area}
+target25pct <- st_union(target_areas) # gets you area in sq kms
+mapview(target25pct)
+st_area(target25pct)/1000000
+```
