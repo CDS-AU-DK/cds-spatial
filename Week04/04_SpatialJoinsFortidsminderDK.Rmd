@@ -346,7 +346,7 @@ nearest10index <- which(d<=sorted[10])
 viking_clip[nearest10index,]$anlaegsbet
 #viking[nearest10index,]$geometry
 
-# Plot the results by re-running the plot from exercise 6
+# Plot the results
 plot(nb_buf$geometry, border = "blue")
 plot(st_geometry(parks[cont,]), add = TRUE, col = "aquamarine", border = "grey")
 plot(viking_clip[nearest10index,]$geometry, add = TRUE, col = "red", pch = 4)

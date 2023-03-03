@@ -218,7 +218,7 @@ nearest10index <- which ( __________) # which distances are smaller than the 10t
 # Identify the viking monuments that are the nearest, what kinds of monuments are they?
 viking_clip[_________,]$anlaegsbet
 
-# Plot the results by re-running the plot from exercise 6
+# Plot the results
 ```
 
 Nice work! If you look at the result for the last line of code carefully you'll see that the closest viking monument is Befæstning at 1580m. In this case one of our feature sets was a single feature. You may end up applying this function in situations where there are multiple features in both objects. In this situation `sf` will return a matrix. Distance matrices take long time to calculate and so sometimes you calculate distance between the nearest two features from two different datasets. That will be the homework :)
