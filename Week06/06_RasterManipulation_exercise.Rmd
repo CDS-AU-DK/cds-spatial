@@ -1,0 +1,356 @@
+---
+title: "06 - Raster manipulation and analysis"
+author: "Adela Sobotkova"
+date: "06/02/2022 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+## Welcome to Bulgaria
+
+Throughout these exercises, you will be working with two different types of satellite imagery for the Kazanlak Valley in central Bulgaria. The images are provided by the JICA and GeoEye Foundation respectively: 
+
+* Aster image contains the elevation values for the area.
+* IKONOS image is a 4-band satellite image covering ca 150 sq km of the Kazanlak Valley with red, green, blue and infrared band, captured in 2001. As it is a fairly large orthophoto, I divided it into two halves with each half at 2 GB and placed them in ScienceData. You can download the full-resolution images manually from public [www.sciencedata.dk](https://sciencedata.dk/shared/104dc1b7a08529650379d858979ae104) folder, or directly with with `file.download()` using these direct links for [West](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazWestfused.tif) and [East](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazEastfused.tif) respectively. In exercise 6 you will play with a slightly reduced East image, which is provided as part of Github data folder.
+
+You will learn to work with these rasters and plot vector data over them.
+
+
+# Task 1: Access raster data values
+Raster data can be very big depending on the extent and resolution (grid size). In order to deal with this the `raster()` and `brick()` functions are designed to only read in the actual raster values as needed. To show that this is true, you can use the `inMemory()` function on an object and it will return `FALSE` if the values are not in memory. If you use the `head()` function, the `raster` package will read in only the values needed, not the full set of values. The raster values will be read in by default if you perform spatial analysis operations that require it or you can read in the values from a raster manually with the function `getValues()`.
+
+
+## Instructions
+
+* Activate `raster` and `rgdal` library
+* Use `GDALinfo()` to inspect the properties of the Aster image raster in the data folder (the file name is "Aster.tif"). What can you learn from this inspection about its bands, resolution, and projection? 
+* Read in the Aster image. Review Week 02 raster loading if unsure about how.
+* Use the `inMemory()` function on the elevation object to determine if the data has been read in.
+* Use the `head()` function to look at the first few values from the elevation raster.
+* Use the `getValues()` function on the elevation object to read in all the data.
+* Use the `hist()` function to create a quick histogram of the elevation values. Note the pile of values near -9999, these should be `NA`  (any idea why?) and we will address this later.
+
+```{r access-raster, echo=TRUE, eval=FALSE}
+# Library
+___(raster)
+
+# Read in the elevation layer
+elevation <- ___("data/Aster.tif")
+
+# Check if the data is in memory
+___(___)
+
+# Use head() to peak at the first few records
+___(___)
+
+# Use getValues() to read the values into a vector
+vals <- ___(elevation)
+
+# Use hist() to create a histogram of the values
+___(vals)
+
+```
+
+
+Congratulations! You now know that the `raster` package only reads in raster values as needed to save space in memory. You can get the values manually using the `getValues()` function.
+
+Now, a new question arises, why are so many values encoded as -9999? Are we in the Mariana Trench all of sudden?
+
+
+# Task 2: Change values: handle missing or bad data values in rasters
+There are many situations where you might need to recode raster values. You may want to change the outlier values to `NA` for example. In the `raster` package, reclassification is performed with the `reclassify()` function.
+
+In the `elevation` raster you've worked with the values are meters above sea level and are supposed to range between 0 and 2500. Anything below 0 should be an `NA`. In this exercise you will assign any values below 0 to `NA`.
+
+## Instructions
+
+* Check that the package `raster` and the object `elevation` are loaded in your workspace.
+* Plot the `elevation` raster using `plot()`.
+* Set up a three-column matrix with the `cbind()` function and values -10000, 0, NA.
+* Use the matrix and `reclassify()` to reclassify values below 0 to `NA`. You will need to use the argument `rcl`.
+* Plot the reclassified elevation layer to confirm there are no values below 0.
+
+```{r reclass, eval=FALSE}
+# Plot the elevation layer to see the legend values
+___(elevation)
+
+# Set up the matrix
+vals <- ___
+
+# Reclassify 
+elevation_reclass <- ___(elevation, ___ = ___)
+
+# Plot again and confirm that the legend range is 0 - 2400
+___(elevation_reclass)
+
+```
+
+Good work! Knowing how to reclassify rasters will come in handy. When you get a chance you should review the help for `reclassify()` particularly the part that discusses how to specify the `rcl` argument. The three-column approach from this exercise is most common but there are other approaches.
+
+# Task 3: Corp and mask rasters on the basis of other spatial objects
+Mask and crop are two similar operations that allow you to limit your raster to a specific area of interest. With `mask()` you essentially place your area of interest on top of the raster and any raster cells outside of the boundary are assigned `NA` values. With `crop()` you limit the extent of your raster to that of your focus area. 
+
+The Aster image covers a large area, but we are primarily interested in the areas surveyed by archaeologists, the first of which is the cluster of burial mound points and second, large survey polygons registered by local archaeologists during field survey. In this exercise you will use the extent of mounds and survey units to crop and mask the elevation raster.
+
+On some OSs, `raster` package does not support `sf` objects. This should not happen now, but if you encounter difficulty with raster:vector interactions, it helps to know that you can convert the vector to `Spatial` object with, for example, `as(input, "Spatial")`.
+
+## Instructions I - Crop raster by mounds extent
+
+* Load `sf` library
+* Create `mounds` object from the shapefile "KAZ_mounds.shp". For a refresher on vector loading, check out Week 02 instructions.
+* Verify that `mounds` CRS matches the `elevation` CRS and fix with `st_transform()` if not.
+* Create a bounding box `mounds_bb` around the mounds with `st_make_grid()` following Week 03 guidelines.
+* Plot the `mounds_bb` and the `mounds` to see how these two objects relate.
+* Crop the `elevation` layer by the `mounds` object using the `crop()` function and create a smaller `elev` object
+* Plot the `elev` and `mounds` and the `mounds_bb` together.
+```{r  mounds-crop, eval = FALSE}
+# YOUR CODE
+```
+
+## Instructions II - Filter largest survey polygons
+
+* Create `survey` object from a shapefile called "KAZ_units.shp"
+* Project the `survey` object to match the new `elev` raster with `st_transform()`if needed. 
+* Compute the area of the survey with `st_area()` and save this object as `areas`. What units are these?
+* Filter the survey units to only those above 30 ha with the `filter()` function. You will need to wrap `areas` in `unclass()`. Save as `survey_big`. Remember to have the tidyverse or dplyr library attached for `filter()` to work properly. Also `sf` might interfere so specify the `dplyr::filter()` if needed.
+
+```{r filter-area, eval=FALSE, echo=TRUE}
+# Read in the survey object
+survey <- ___(___)
+
+# Compute the area of the survey
+areas <- ___(survey)
+
+# Filter to survey with areas > 30000
+survey_big <- ___(survey, ________ > 30000)
+```
+
+## Instructions III - Mask raster by largest polygons
+
+* Review the plot of `elev` raster.
+* Plot the geometry of the `survey_big` over it.
+* Mask the `elev` layer with `survey_big` and save as `elevation_mask`. This may take a couple of seconds.
+* Review the plot of `elevation_mask`. 
+```{r plot-elevation, eval=FALSE}
+# Plot the elevation raster
+plot(________)
+
+# Plot the geometry of survey_big
+plot(_________(survey_big))
+
+# Mask the elev layer with survey_big and save as elevation_mask
+elevation_mask <- ________(elev, mask = survey_big)
+
+# Plot elevation_mask -- this is a raster!
+plot(elevation_mask)
+```
+
+Nice! You ensured that layers had the same CRS, you cropped the raster, computed bounding boxes and areas for masking and filtered the data. Finally, you used `mask()` to mask the elevation raster to show only the large survey units.
+
+### Question: 
+ 
+*1. What extent does the elevation raster default to after cropping by mounds vs by masking by the large polygons of survey_big?*
+
+*2. Why do we not use the mounds bounding box to crop the elevation raster?*
+
+# Task 4: Reduce the raster resolution (grid cell size) using aggregate()
+Rasters, such as ortophotos, terrain models, or aggregated rasters for large area, often come in resolutions far greater than you need. Up till now you have played with fairly small, processed rasters. Now you are getting a taste of the real thing.  To reduce the computational load when running analyses, or when developing the right approach, you should use a reduced resolution raster.
+
+The function to reduce resolution in rasters is `aggregate()` which, as you might guess, aggregates grid cells into larger grid cells using a user-defined function (for example, mean or max). The function used to aggregate the values is determined by the `fun` argument (the default being mean) and the amount of aggregation is driven by the `fact` argument (the default being 2).
+
+## Instructions
+
+* Load the East half of the two IKONOS images of the Kazanlak Valley from ("KazE.tif"). See *Welcome to Bulgaria* for links. 
+* Plot the file you read in with the appropriate function for a multi-band raster.
+* Determine the raster resolution using `res()` and number of raster cells in the layer with `ncell()`.
+* Aggregate the IKONOS image using the default for `fun` and with a `factor` of 10 and save the new raster to `east_small`.
+* Plot the new raster for comparison to the old version.
+* Determine the new raster resolution and the number of raster cells.
+
+```{r aggr, eval=FALSE}
+# Load the IKONOS raster
+east <- ________________ 
+
+# Plot the IKONOS raster
+___(east)
+
+# Determine the raster resolution
+___(east)
+
+# Determine the number of cells
+___(east)
+
+# Aggregate the raster
+east_small <- ___(east, fact = ___)
+
+# Plot the new east layer
+___(east_small)
+
+# Determine the new raster resolution
+___(east_small)
+
+# Determine the number of cells in the new raster
+___(east_small)
+```
+
+Lovely job! In this example you read in a raster and then converted it to a lower resolution raster to save on the size of the object and ultimately computation power required. In this example, the raster was not too big to begin with so perhaps aggregating would not be necessary but for big rasters such as you will see in remote sensing session (next week), this can be a big help and a necessity.
+
+# Task 5: Extract raster values by location
+Beyond simply masking and cropping you may want to know the actual cell values at locations of interest. You might, for example, want to know the elevation at each mound location or perhaps the mean elevation within the large survey units. This is where the `extract()` function comes in handy.
+
+Usefully, and you'll see this in a later analysis, you can feed `extract()` a function that will get applied to extracted cells. For example, you can use `extract()` to extract raster values by point, line, polygon, or neighborhood and with the `fun = mean` argument it will return an average cell value by neighborhood.
+
+## Instructions
+
+* Ensure `mounds` and `elev` or `elevation` objects are still in memory.
+* Use the `raster` function `extract()` to determine the elevation at each of the mounds. Assign the extracted value into a `elev` column in the mounds object. Beware that the `extract()` function exists across multiple packages, so it's wise to use `raster::` in front of it.
+* Look at the `mounds` elevation column through the `plot()` function as well as histogram. Do the `extract()` results make sense? The `elevation` layer values represent meters above sea level.
+
+```{r extract, eval=FALSE}
+
+# Extract the elevation values at the mound locations 
+________$elev  <- _______::______(elevation, mounds)
+
+# Look at the mounds and extraction results
+____(mounds[_______])
+hist(____)
+```
+
+Great! `raster::extract()` is a very useful tool. It can be used with polygons as well as points, and the result can be written out as a separate vector or added to an existing object as a column. 
+
+
+# Task 6: Raster math with overlay
+You will now use the `elevation` layer and an "prominence" layer. Prominence measures what percentage of surrounding cells are visible from any given location in the raster. A high percentage value thus indicates a prominent point, while a low percentage indicates a low-lying location with poor inter-visibility. Archaeologists assert that mounds sit in high elevations and have a good field of visibility, so let's see whether they are mostly right :)
+
+What you will do in this exercise is essentially: identify the most prominent locations among the registered archaeological mounds by finding areas that have both a high percentage of prominence and a high elevation. You will use two rasters and you will define an overlay function `f` to do the raster math with. Remember that raster algebra uses basic Boolean logic to select desirable values. Note that you can only do raster math on two rasters of the same *extent*, so make sure you align the elevation and prominence accordingly with the `crop()` function
+
+## Instructions
+
+* Make sure the `elevation` object exists in memory ("Aster.tif", it is a single-band raster).
+* Read in the prominence raster layer from "prominence.tif"; it is also a single-band raster.
+* Plot the `prominence` object. Do the legend units make sense?
+* Specify function `f`, where you select elevation values greater than 400 msl and below 650m (mounds don't appear above that elevation) and prominence values over 60%
+* Call `overlay()` on `elevation` and `prominence`. Set the `fun` argument to `f`.
+* If you have not cropped the two rasters to the same extent yet, you can do so inside the `overlay()` function
+
+
+```{r overlay, eval=FALSE, echo=TRUE}
+# Check in on the elevation and read in prominence layer
+elevation
+prominence <- ___(___)
+
+# Plot prominence
+plot(prominence)
+
+# Function f with 2 arguments and the raster math to select specific elevation range and prominence values
+f <- function(rast1, rast2) {
+    rast1 > _________ & rast2 ___________
+}
+
+# Align the extent of the two rasters with crop()
+__________
+
+# Do the overlay using the above define f function in the `fun` argument. 
+elevation_prom_overlay <- ___(elevation, ___, fun = ___)
+
+
+# Plot the result (low elevation and high prominence areas)
+___(elevation_prom_overlay)
+```
+
+Congratulations! You've now learned to perform raster math using the raster function `overlay()`. You limited to areas with > 400m & <650m elevation and > 60% prominence, these areas should harbor the most prominent mounds (or defense-ready areas if associated with settlements) in Kazanlak.
+
+### Questions:
+
+*3. What is the actual value range in the `prom_el_overlay` raster? * 
+
+*4. What area is covered by each cell?*
+
+# Task 7 - HOMEWORK: Inspect the most prominent mounds
+
+In the above exercise, we produced an elevation-prominence overlay. Mounds and other sites that sit in this overlay enjoy a strategic position vis-a-vis the rest of the valley. Which ones are they, however, and what are their real prominence values?  It is hard to see at the scale of the valley and it would be good to pull the sites out. 
+
+Find the mounds that enjoy the most prominent locations as well as those that feature in the elevation-prominence overlay raster. Produce a list of the ID numbers (TRAP_Code) of all the overlay mounds and 25 most prominent mounds and plot them (expressing their prominence somehow) . 
+
+## Instructions
+
+* Check that you have the `mounds` sf object, `prominence` and `prom-el-overlay` rasters.
+* Plot the `prom-el-overlay` and the `mounds` on top of each other to check visual overlap. Do the same with `prominence` raster and `mounds`.
+* Extract values from the elevation-prominence overlay raster and from the prominence raster at mound locations and write them to two columns:
+
+  -- call the first column `prom_el_overlay` 
+  -- name the second column `prominence` 
+* Make an object of mounds that sit within these strategic high-visibility locations. How many are there?
+* Make an object of 25 mounds with the highest prominence values (remember `arrange()` and `slice()`?). Which `TRAP_Code` ids are included? 
+* Plot both these sets of mounds using the `mapview()` library and compare their locations. 
+
+```{r prom-mnd-ex}
+# YOUR CODE
+```
+
+### Question:
+
+*5. How do the mounds with high prom_el_overlay values differ from those with high prominence? *
+
+# Task 8 - HOMEWORK: Sum raster values across polygons - assessing prominence of past settlements
+
+Previously you have extracted values from rasters at point locations. More often, you will need to extract values using more complex vector shapes where you will need to decide how to summarize the raster values that fall within the shape. 
+
+In this exercise, you will load the layer of ancient settlements for the Kazanlak Valley and calculate and plot the overlapping elevation_prom_overlay values within the settlement polygons. Then you will find out which of the sites were likely defensive in function and contained at least 0.5 ha of strategic high-visibility area.
+
+## Instructions
+
+* Create a `sites` sf object by reading in polygons from "KAZ_nuclei.shp"
+* Plot the elevation-prominence overlay and the sites on top of each other
+* Use `mask` function to create a `sites_mask` raster, where raster cells under sites' polygons retain their original values, while cells outside the polygons are turned to `NA`.
+* Use `crop` function to crop `sites_mask` raster to the extent of the sites' polygons.
+* Plot the result ( I recommend `mapview()`)
+* Produce a list of sites that have at least 0.5 ha (ie. 6 grid cells) within these strategic high-visibility locations. 
+-  first, extract the high elevation & prominence values for the `sites` object into `defensive` object
+-  second, use `sapply()` to filter out the `defensive` object for values > 6)
+
+```{r mask-crop-sites,eval = FALSE}
+# Read in the site polygons
+sites <- ______("data/KAZ_nuclei.shp")
+
+# Plot the sites
+plot(elevation_prom_overlay);plot(__________)
+
+
+# Create a raster mask from the elevation_prom_overlay using the sites
+sites_mask <- _____________
+
+# Crop the raster mask to the sites
+sites_strat <- _____________
+
+# Plot and compare the results
+plot(sites_mask)
+plot(sites_strat)
+
+
+# Which ones overlap?
+defensive <- raster::extract(_______, ______)
+
+
+# Produce a list of the sites that occupy at least 6 grid cells of most prominent terrain
+sites[_______(sapply(defensive, sum)>6),]
+```
+
+Lovely work! Manipulating rasters and mastering raster-vector interactions is the bread and butter of spatial data wrangling :)
