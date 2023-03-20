@@ -244,7 +244,7 @@ What you will do in this exercise is essentially: identify the most prominent lo
 ## Instructions
 
 * Make sure the `elevation` object exists in memory ("Aster.tif", it is a single-band raster).
-* Read in the prominence raster layer from "prominence.tif"; it is also a single-band raster.
+* Read in the prominence raster layer from "prominence1500.tif"; it is also a single-band raster.
 * Plot the `prominence` object. Do the legend units make sense?
 * Specify function `f`, where you select elevation values greater than 400 msl and below 650m (mounds don't appear above that elevation) and prominence values over 60%
 * Call `overlay()` on `elevation` and `prominence`. Set the `fun` argument to `f`.
@@ -261,7 +261,7 @@ plot(prominence)
 
 # Function f with 2 arguments and the raster math to select specific elevation range and prominence values
 f <- function(rast1, rast2) {
-    rast1 > _________ & rast2 ___________
+    rast1 _________ & rast2 ___________
 }
 
 # Align the extent of the two rasters with crop()
@@ -344,8 +344,7 @@ sites_strat <- _____________
 plot(sites_mask)
 plot(sites_strat)
 
-
-# Which ones overlap?
+# Extract the values in the overlapping sites
 defensive <- raster::extract(_______, ______)
 
 

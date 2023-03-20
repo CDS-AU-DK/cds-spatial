@@ -1,0 +1,72 @@
+---
+title: "Week 07 Homework: Random Forests"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+  highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# What is the most productive approach to classification of the IKONOS imagery in Kazanlak?
+
+Being able to classify imagery and observe change over time is helpful for sustainable development plans for environment and cultural heritage alike. Besides the golden treasures of ancient kings, Kazanlak Valley is also world-famous for its production of rose attar. Most of it is sold to Japan for cosmetics today, however, the industry has long history, having started under the Ottomans, who used rose water and oil to keep their harems happy. 
+Wouldn't it be nice to tell how much ground is covered with the rose fields today? Hint: roses were marked under `perennial` or `cropland` category during field survey, and teams generally avoided them, so many will be outside the survey area due to poor ground visibility. In search for the roses, you can practice classification of categorical rasters by conducting and comparing unsupervised (kmeans) and supervised (Random Forest) classification. The Random Forest exercise is inspired by [this manual](https://geoscripting-wur.github.io/AdvancedRasterAnalysis/).
+The way to proceed is: 
+
+* Choose a subset of the area (either the West or the East part), or downsample your raster
+* Run kmeans classification for 5-6 clusters. 
+* Run Random Forests classification on IKONOS satellite imagery from Bulgaria
+  - In order to train your Random Forest classification, try to use the `kaz_training_aggr.shp` shapefiles which contain a couple polygons aggregated by landuse (annual vs perennial agriculture, beach, forest, scrub, urban, water) within the area walked in 2009-2011.
+* Evaluate and compare the outputs of both models. What works better and why?
+
+
+## Data
+The available archaeological and administrative data as well as the Aster image can be found in the Github data folder. The IKONOS satellite images (large at 2Gb a piece) can be downloaded from public [www.sciencedata.dk](https://sciencedata.dk/shared/104dc1b7a08529650379d858979ae104) folder, or directly with `file.download()` using these direct links for [West](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazWestfused.tif) and [East](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazEastfused.tif) respectively. 
+
+* Archaeological:
+  - `KAZ_mounds` -  shapefile of GPS points taken on top of each mound in Kazanlak 
+  - `KAZ_mdata.csv` - table of mound attributes, including Condition (1-5), Robbed (0/1), Height(numeric), and Landuse(factor)
+  - `KAZ_surveyarea` - polygon shapefile of the area covered through pedestrian survey  
+  - `KAZ_units` - polygon shapefiles for individual survey units - arbitrary spatial containers for field observations. They range in size from 50 by 50m to 100 by 100m and their size/shape usually encompass with uniform environmental circumstances. The attributes include SU_LU and SU_AgrCond which numerically encode landuse and agricultural condition respectively, following [this coding sheet](https://docs.google.com/spreadsheets/d/14HoYRAKdi4w82nzCqhVcynGyjwrB6gutBePIs3c7Om0/edit#gid=1709790093). 
+  - `KAZ_training_aggr` - a few polygons aggregated by characteristic landuse 
+  
+Beware that the survey dataset `KAZ_training_aggr` has the following limitations:
+
+* teams focused on accessible areas with high visibility so annual agriculture is likely over-represented,
+* categories of landuse were assigned on majority basis, so if 60% of field was ploughed and 40% was scrub, the unit is marked as annual agriculture; and
+* the data is 10 years younger than the IKONOS image, captured in 2001, which can cause discrepancies. Visual checks and subsetting to areas that look best will be necessary.
+
+
+
+* Satellite imagery
+  - `KazEastfused.tif` - IKONOS image, fused panchromatic and multispectral image (resulting in 1m res) with 4 bands (BGRNIR) for **eastern** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where in the landscape the mounds are vis-a-vis towns, rivers, etc..
+  - `KazWestfused.tif` - IKONOS image, fused pan+mul image (resulting in 1m res) with 4 bands (BGRNIR) for **western** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where the mounds are
+  - `Aster` - digital elevation model for the Kazanlak Valley with 30m resolution. Produced by Advanced Spaceborne Thermal Emission and Reflectance Radiometer of NASA's Terra satellite, it is now available via USGS  [Application for Extracting and Exploring Analysis Ready Samples](https://lpdaacsvc.cr.usgs.gov/appeears/).
+
+
+# Specify your approach and elaborate your solution here:
+```{r eval=FALSE}
+library(raster)
+library(sf)
+train <- st_read("../data/kaz_training_aggr.shp")
+## YOUR CODE
+```
+
+
+
+*Write the outputs of kmeans and RF model to file and discuss the differences and cost/benefit ratio.*

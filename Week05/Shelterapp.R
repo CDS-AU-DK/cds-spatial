@@ -4,7 +4,7 @@ library(mapboxapi)
 library(sf)
 
 token <- my_token
-# Read in the shelter data
+  # Read in the shelter data
 shelter <- readr::read_rds("../data/shelters.rds") 
 
 st_crs(shelter) <- 4326

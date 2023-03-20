@@ -1,0 +1,109 @@
+---
+title: "Week 07 Homework: Kazanlak Mound Spatial Analysis"
+author: "Adela Sobotkova"
+date: "24/02/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+## Cultural Heritage Assessment with DEM and survey data 
+
+In this exercise, you **develop your own analysis**,  extracting values from and working with ASTER or IKONOS imagery and a variety of modern and archaeological data for the Kazanlak Valley in Bulgaria. Choose **ONE** of the tasks below and delete the other. Review the available datasets, and read the information in the relevant section as a jumping-off point. Create simple  visualisations to illustrate your results (if relevant). The two possibilities for analysis are:
+
+1. evaluate the impact of anthropogenic factors on the burial mound health, or
+2. analyze formally the location preferences of the ancient mound builders
+
+Burial mounds are ubiquitous in the Bulgarian landscape, and the golden treasures discovered in the Kazanlak Valley mounds have earned this intramontane area the nickname "The Valley of the Thracian Kings". The present dataset includes over 700 mounds documented during intensive pedestrian survey within the Kazanlak Valley and extended through the remote sensing of the additional 150 sq km of IKONOS imagery. The mounds range in height from 0.2m to ~20m, and in diameter from 15 to 100m. Their contents represent a cross-section of the ancient society, producing a fairly representative sample of ancient mortuary behavior.
+
+## Data
+The available archaeological and administrative data as well as the Aster image can be found in the Github homework folder. The IKONOS satellite images (large at 2Gb a piece) can be downloaded from public [www.sciencedata.dk](https://sciencedata.dk/shared/104dc1b7a08529650379d858979ae104) folder, or directly with `file.download()` using these direct links for [West](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazWestfused.tif) and [East](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazEastfused.tif) respectively. 
+
+* Archaeological:
+  - `KAZ_mounds` -  shapefile of GPS points taken on top of each mound in Kazanlak 
+  - `KAZ_mdata.csv` - table of mound attributes, including Condition (1-5), Robbed (0/1), Height(numeric), and Landuse(factor)
+  - `KAZ_surveyarea` - polygon shapefile of the area covered through pedestrian survey  
+  - `KAZ_units` - polygon shapefiles for individual survey units - arbitrary spatial containers for field observations. They range in size from 50 by 50m to 100 by 100m and their size/shape usually encompass with uniform environmental circumstances. The attributes include SU_LU and SU_AgrCond which numerically encode landuse and agricultural condition respectively, following [this coding sheet](https://docs.google.com/spreadsheets/d/14HoYRAKdi4w82nzCqhVcynGyjwrB6gutBePIs3c7Om0/edit#gid=1709790093). 
+
+* Modern, Administrative and other
+  - `kaz_roads` - polyline shapefile for Bulgaria
+  - `kaz_citiespoly` - polygon shapefile with settlement boundaries for Bulgaria
+  - `kaz_cities` - point shapefile for settlements in Bulgaria
+  - `kaz_streams` - small and large watercourse polylines in the Kazanlak valley
+  - `kaz_streams1940` - reconstruction of the river/stream system predating the construction of the central dam of Koprinka
+  - `kaz_rivers` - major rivers in the Kazanlak valley
+  - `kaz_lakes` - waterbodies in the Kazanlak valley, Koprinka reservoir being the largest.
+
+* Satellite imagery
+  - `KazEastfused.tif` - IKONOS image, fused panchromatic and multispectral image (resulting in 1m res) with 4 bands (BGRNIR) for **eastern** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where in the landscape the mounds are vis-a-vis towns, rivers, etc..
+  - `KazWestfused.tif` - IKONOS image, fused pan+mul image (resulting in 1m res) with 4 bands (BGRNIR) for **western** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where the mounds are
+  - `Aster` - digital elevation model for the Kazanlak Valley with 30m resolution. Produced by Advanced Spaceborne Thermal Emission and Reflectance Radiometer of NASA's Terra satellite, it is now available via USGS  [Application for Extracting and Exploring Analysis Ready Samples](https://lpdaacsvc.cr.usgs.gov/appeears/).
+
+
+## General guidelines 
+
+1. Aggregate and crop the IKONOS images if you wish to use them (I recommend using factor of 10 to downsample from 1 to 10m resolution). They are quite heavy at 2Gb a piece to work with now. Aster is not that heavy, but could use cropping as well.
+2. Before extracting values from raster or measuring proximity between vector features, remember to verify CRS alignment and **project** to common CRS. Bulgaria sits in the `UTM35N zone`.
+3. You can extract a lot of values for burial mounds (or burial mound neighborhoods) from the ASTER DEM. `terrain()` function in the raster package can help you manipulate DEM further to get slope, aspect and other values than elevation.
+4. Remember `inner_join`, `left_join` and other functions that let you join non-spatial data with sf objects using a shared column.
+5. Remember Rosling's *The Size Instinct* and use comparison and division to keep numbers in proportion.
+6. More serious statistical analysis of mound health is possible but not necessary. For those who want a challenge, check out [Eftimoski et al. 2017](https://www.sciencedirect.com/science/article/abs/pii/S1296207416302606))
+
+
+# Task 1: Analyze burial mound health
+A number of factors can negatively affect cultural heritage, from natural post-depositional processes, such as chemical and mechanical weathering, to animal-activity and human-inflicted damage, which can be either direct (excavation, looting) or indirect (development, agricultural activities, transport).
+In order to understand the anthropic impacts on cultural heritage, archaeologists routinely document the condition of different types of cultural remains. In the burial mounds dataset, the `Condition` column contains a professional judgment of monument health recorded on a Likert-scale from 1 to 5, where 1 means the feature is in pristine state, while 5 means it is extinct or nearly so. The `'Robbed'` column, specifies via a binary value of 1/0 (corresponding to Yes/No), whether looting was detected on site. The `LandUse` column contains the surrounding land use, which can also relate to the condition.
+
+Design a study to evaluate direct or indirect impacts on burial mounds. You can use the provided datasets to extract a number of possible variables for this purpose:
+
+* location-related variables such as elevation, aspect, slope (are mounds on steep slopes or in lower elevations disproportionately more vulnerable? )
+* mound size (are larger mounds disproportionately affected by looters?)
+* mound proximity to roads, rivers, nearest settlement boundary or center, regional capital boundary or center (do looters rob mounds that are closer to the settlements? are mounds near large urban centers disproportionally damaged/looted? are mounds in the vicinity of the Koprinka reservoir - the large dam in the middle of the valley, see kaz_lakes.shp - more damaged?)
+* landuse around the mound (are mounds in agricultural fields more prone to damage than mounds in the forests?)
+
+Take one or more questions and elaborate it into a study using spatial operations on vector and raster. 
+
+### Specify your Question(s) and elaborate your solution here:
+
+```{r}
+## Your code goes here
+```
+
+### Summary
+
+
+# Task 2: Where in the landscape are the mounds located?
+The location of settlements is usually easy to predict as humans need safety and easy access to water and food resources. These range from nearby arable soil to pasturage to trading centers. Choices regarding the mortuary realm are much harder to establish as they are guided by the social norms of the living rather than the natural environment. 
+Some environmental conditions, however, play a role, such as intervisibility, which can be an important factor for societies that use monuments to the dead for territorial signalling.  Before such specific analysis, it is, however, a good idea to get a general sense of where in the landscape are mounds located.
+
+In order to produce a formal assessment of mound location, you can start by using most common aspects of topography, such as elevation, slope, aspect, and water proximity. Choose one or more of these variables. Calculate the distribution of classes of each environmental variable through the entire region (defining, en route, what you consider to be a "region"?) by extracting values from the digital elevation model and binning them in several classes. Then, calculate site frequencies within classes of the environmental variable by sampling mound locations in the raster and evaluate whether the observed pattern could be a product of the distribution of environmental categories themselves. 
+
+A example workflow with elevations could look like this:
+
+*   extract elevation values from the entire landscape and bin them in elevation categories (e.g. 400-500m, 500-600m, 600-700m, etc.). Consider: what defines a landscape for the purpose of this study? You may wish to crop the Aster to a smaller but representative *study area* but make sure you justify your selection
+*   extract elevation values from observed mound locations and review their distribution in the same bins  
+*   calculate the expected number of mounds per bin if mounds were located through the landscape randomly
+*   compare the expected number with the observed one 
+
+### Specify your approach and elaborate your solution here:
+
+```{r}
+## Your code goes here
+```
+
+### Summary
