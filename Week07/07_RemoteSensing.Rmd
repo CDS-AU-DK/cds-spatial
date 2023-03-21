@@ -115,10 +115,9 @@ j4<-raster(july4) # near-infrared
 
 ## check out the image histogram	
 plot(j1)
+plot(j4)
 hist(j1, main="Band 1 - Blue of Landsat")	
 boxplot(j1, main="Band 1 - Blue of Landsat")		
-
-
 ```
 
 
@@ -169,7 +168,16 @@ Finally, drape one of the images over a 3D model. This bit can be a bit touchy a
 ```{r dem-3d, eval=FALSE}
 ## finally...
 rglwidget()  # this widget helps get the first view rendered in rmarkdown, refreshing however is more tedious
-plot3D(dem, col=rainbow(255)) ## you need to close RGL device manually first and then run this line!
+
+?rglwidget()
+
+t <- plot3D(dem, col=rainbow(255)) ## you need to close RGL device manually first and then run this line!
+
+
+# Save it to a file.  This requires pandoc
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)
 
 plot3D(dem, drape=j4) ## should drape image j4 over DEM, if problematic try in .R script and watch for a pop-up widget. Ask Adela to demo!
 
@@ -293,7 +301,7 @@ ICE_df <- as.data.frame(myNewBrick)
 set.seed(99)
 
 
-cluster_ICE <- kmeans(ICE_df, 4) ### kmeans, with 4 clusters
+cluster_ICE <- kmeans(ICE_df, 10) ### kmeans, with 4 clusters
 str(cluster_ICE)
 # cluster_ICE <- cluster::clara(ICE_df, 4) ### another option, clara, with 4 clusters
 
@@ -304,12 +312,11 @@ clusters
 plot(clusters)
 
 # uncomment to plot the clusters in 3D over the DEM
-plot3D(dem, drape=clusters, col=c("red", "green", "blue", "yellow"))
+plot3D(dem, drape=clusters, col=c("white", "green", "blue", "yellow"))
 
 # calculate the average spectral signature of 1-4 bands of growth
 ICE_mean <- zonal(myNewBrick, clusters, fun="mean")  
 ICE_mean  # see the values for ndvi (layer) being most distinct
-
 
 ```
 Note that you have aggregated the final cluster raster by using the `focal()` function using the `mean` function on the four clusters identified by `kmeans()` as similar.
@@ -325,7 +332,7 @@ data(imgData)
 plot(imgData)
 
 # Use the itcIMG() function to detect and grow the individual crowns
-se<-itcIMG(imgData,epsg=32632)
+se<-itcIMG(imgData, epsg=32632)
 
 # What is the product of the function? Is it a raster or vector?
 summary(se)
@@ -347,7 +354,7 @@ se      # it is a Spatial object
 crs(se) # what is its crs?
 
 # Project the SpatialPolygon using the spTransform() function
-se4326 <- spTransform(se,CRS( "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "))
+# se4326 <- spTransform(se,CRS( "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "))
 
 # Project the SpatialPolygon using sf library
 library(sf)
