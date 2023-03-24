@@ -1,0 +1,122 @@
+---
+title: "Mapping Bathouses of Copenhagen"
+author: "Adela Sobotkova"
+date: "March-2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+This script visualizes the spatial component of the data accompanying the Spring 2021 course on the City: Between Culture and Nature, taught by Mikkel Thelle and Mikkel Høghøj. 
+The course surveys the gradual appearance of private and public bathing facilities, toilets and communal hygienic resources in the city of Copenhagen during the 20th century.
+
+This script produces an interactive map of the public bathing houses and other facilities in Copenhagen in early 20th century.
+See if you can plot the provided data and differentiate by color the baths whose location is known with certainty (Quality = 1) and where it is quesstimated (Quality = 2)
+
+# Before we start: libraries
+First load the packages necessary for spatial data visualisation and analysis. You need to run this chunk before all others. 
+```{r libraries}
+library(sf)
+library(tidyverse)
+library(googlesheets4)
+library(leaflet)
+```
+
+# Collect some background maps from the internet
+Next, we prepare the map background by grabbing layers of satellite images, street maps and others available from online web mapping services run by Esri or Stamen. In this chunk of code, we focus on Copenhagen coordinates and pull in all map backgrounds provided by Esri as a backdrop to our bathhouses.  
+```{r bckgrounds}
+# Bring in a choice of Esri background layers  
+l_cp <- leaflet() %>%   # assign the base location to an object
+  setView(12.56553, 55.675946, zoom = 11)
+#l_cp %>% addTiles()
+
+esri <- grep("^Esri", providers, value = TRUE)
+for (provider in esri) {
+  l_cp <- l_cp %>% addProviderTiles(provider, group = provider)
+}
+```
+
+# Create a background map
+```{r map-base}
+# Create the map
+MapCPH <- l_cp %>%
+  addLayersControl(baseGroups = names(esri),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  addMiniMap(tiles = esri[[1]], toggleDisplay = TRUE,
+             position = "bottomright") %>%
+  addMeasure(
+    position = "bottomleft",
+    primaryLengthUnit = "meters",
+    primaryAreaUnit = "sqmeters",
+    activeColor = "#3D535D",
+    completedColor = "#7D4479") %>% 
+  htmlwidgets::onRender("
+                        function(el, x) {
+                        var myMap = this;
+                        myMap.on('baselayerchange',
+                        function (e) {
+                        myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
+                        })
+                        }")%>%
+  addControl("", position = "topright")
+
+MapCPH
+
+```
+
+Wonderful map! Note that you can click on different ESRI layers and see e.g. Copenhagen represented on a satellite image (Esri.WorldImagery).
+
+# Bring in the bathhouse points for Copenhagen
+In the next code chunk you will bring in a googlesheet with Copenhagen bathhouse data, that include Latitude and Longitude. We need these two fields in order to plot data on a map. Practice extracting `Latitude` and `Longitude` from GoogleMaps and other resources, so you know how to acquire these coordinates. 
+
+You may need to authorize the `googlesheets4` package, by authenticating into your preferred google account via a browser window or, if you have authorized it previously, selecting the account you wish to use  in the Console below your script pane.  Make sure you can see the instructions in the Console and follow them interactively!
+
+After you are sure the coordinates are complete and consistent, load them using the `read_sheet()` function into R and using addCircleMarkers() into Leaflet. 
+```{r gs-data}
+# Load data from Googlesheet (deauthorize your connection with gs4_deauth() if read_sheet() gives you trouble)
+gs4_deauth()
+baths <- read_sheet("https://docs.google.com/spreadsheets/d/15i17dqdsRYv6tdboZIlxTmhdcaN-JtgySMXIXwb5WfE/edit#gid=0",
+                    col_types = "ccnnncnnnc")
+
+# Prepare a color palette to reflect spatial precision of points
+glimpse(factor(baths$Quality))  # check the Quality values
+factpal <- colorNumeric(c("navy", "red", "grey"), 1:3) # prepare scale
+factpal(c(1,1,2)) # test the scale works
+
+
+# Read the bath coordinates and names into map
+Bathsmap <- MapCPH %>% addCircleMarkers(lng=baths$Longitude,
+                           lat=baths$Latitude,
+                           radius=baths$Quality*3,
+                           color = factpal(baths$Quality),
+                           popup = paste0("Name: ", baths$BathhouseName,
+                                          "<br> Notes: ", baths$Notes))
+Bathsmap
+
+```
+Lovely plotting of historical baths  in your interactive map. You can plot also polygons and other markers in additional layers. 
+
+# Save the map 
+Well, what now with this lovely map? How do you save it for later viewing or for sharing with colleagues? You can save it as html document, using the following chunk 
+```{r save-map, eval = false}
+# Save map as a html document, beware that it only works in root directory
+library(htmlwidgets)
+saveWidget(Bathsmap, "Bathhousemap.html", selfcontained = TRUE)
+```
+

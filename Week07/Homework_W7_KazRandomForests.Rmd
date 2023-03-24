@@ -1,0 +1,357 @@
+---
+title: "Week 06 Homework: RF Solution"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+  highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# Task: How to best classify the IKONOS imagery in Kazanlak?
+
+Being able to classify imagery and observe change over time is helpful for development management plans for environment and cultural heritage alike. Besides the golden treasures of past kings, Kazanlak is also the world-famous producer of the rose attar. Most of it is sold to Japan for cosmetics today, however,  the industry started under the Ottomans, who kept their harems happy with the rose water and oil. 
+Can you tell how much ground is covered with the rose fields today? Hint: roses were marked under perennial category during field survey, and teams generally avoided them, so many will be outside the survey area due to poor ground visibility. Practice classification of categorical rasters in R by conducting and comparing unsupervised (kmeans) and supervised (Random Forest) classification. For the Random Forests, feel free to follow [this manual](https://geoscripting-wur.github.io/AdvancedRasterAnalysis/)
+
+* Choose a subset of the area (I recommend the East part), or downsample your raster
+* Run kmeans AND random forests classification on IKONOS satellite imagery from Bulgaria
+* In order to train your Random Forest classification, you may use the kaz_training.shp or kaz_training_aggr.shp shapefiles which contain select polygons with landuse (annual vs perennial agriculture, beach, forest, scrub, rose) within the area walked in 2009-2011 (see Data section above for link to coded sheet). 
+* Evaluate and compare both models. What works better and why?
+
+
+## Data
+The available archaeological and administrative data as well as the Aster image can be found in the Github data folder. The IKONOS satellite images (large at 2Gb a piece) can be downloaded from public [www.sciencedata.dk](https://sciencedata.dk/shared/104dc1b7a08529650379d858979ae104) folder, or directly with `file.download()` using these direct links for [West](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazWestfused.tif) and [East](https://sciencedata.dk/public/104dc1b7a08529650379d858979ae104/KazEastfused.tif) respectively. 
+
+* Archaeological:
+  - `KAZ_mounds` -  shapefile of GPS points taken on top of each mound in Kazanlak 
+  - `KAZ_mdata.csv` - table of mound attributes, including Condition (1-5), Robbed (0/1), Height(numeric), and Landuse(factor)
+  - `KAZ_surveyarea` - polygon shapefile of the area covered through pedestrian survey  
+  - `KAZ_units` - polygon shapefiles for individual survey units - arbitrary spatial containers for field observations. They range in size from 50 by 50m to 100 by 100m and their size/shape usually encompass with uniform environmental circumstances. The attributes include SU_LU and SU_AgrCond which numerically encode landuse and agricultural condition respectively, following [this coding sheet](https://docs.google.com/spreadsheets/d/14HoYRAKdi4w82nzCqhVcynGyjwrB6gutBePIs3c7Om0/edit#gid=1709790093). 
+  
+Beware that the survey dataset has the following limitations:
+
+* teams focused on accessible areas with high visibility so annual agriculture is likely over-represented,
+* categories of landuse were assigned on majority bases, so if 60% of field was ploughed and 40% was scrub, the unit is marked as annual agriculture; and
+* the data is 10 years younger than the IKONOS image, captured in 2001, which can cause discrepancies. Visual checks and subsetting to areas that look best will be necessary.
+
+
+
+* Satellite imagery
+  - `KazEastfused.tif` - IKONOS image, fused panchromatic and multispectral image (resulting in 1m res) with 4 bands (BGRNIR) for **eastern** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where in the landscape the mounds are vis-a-vis towns, rivers, etc..
+  - `KazWestfused.tif` - IKONOS image, fused pan+mul image (resulting in 1m res) with 4 bands (BGRNIR) for **western** part of the valley (2Gb). Provider: Geo-Eye Foundation. Good in order to see where the mounds are
+  - `Aster` - digital elevation model for the Kazanlak Valley with 30m resolution. Produced by Advanced Spaceborne Thermal Emission and Reflectance Radiometer of NASA's Terra satellite, it is now available via USGS  [Application for Extracting and Exploring Analysis Ready Samples](https://lpdaacsvc.cr.usgs.gov/appeears/).
+
+
+# Specify your approach and elaborate your solution here:
+```{r}
+library(raster)
+library(sf)
+```
+
+# Let's load the IKONOS imagery (multiband)
+```{r}
+# East first
+kaze <-brick("../data/KazE.tif")
+plotRGB(kaze, stretch= "lin")
+
+# West next
+kazw <-brick("../data/KazW.tif")
+plotRGB(kazw, stretch= "lin") # check what it looks like
+
+
+# Complete area
+
+kaze <- brick("../data/Kaz.tif")
+plotRGB(kaze, stretch = "lin")
+```
+
+# Review the attributes and their correlation
+```{r}
+# Histograms!
+hist(kaze)
+hist(kazw)
+
+# Rescale histograms to be consistent
+par(mfrow = c(1, 1)) # reset plotting window
+hist(kazw, xlim = c(0, 1600), ylim = c(0, 50000), breaks = seq(0, 1500, by = 100))
+```
+
+```{r}
+pairs(kazw)
+pairs(kaze)
+```
+
+# Calculate NDVI
+Now, let's calculate the NDVI using raster algebra or overlay
+```{r}
+# Extract bands 3 and 4 (Red and Near-Infrared)
+kaze3 <- kaze[[3]]
+kaze4 <- kaze[[4]]
+ndvi <-  overlay(kaze4, kaze3, fun=function(x,y){(x-y)/(x+y)})
+plot(ndvi)
+hist(ndvi)
+minValue(ndvi)
+```
+
+
+```{r}
+# Reclassify if subzero values bother you
+mat <- cbind(-0.8,0,0)
+ndvi_0 <- reclassify(ndvi, rcl = mat)
+plot(ndvi_0) # lots of bare soils reflect near 0 (it might be good to try SAVI)
+```
+
+# Unsupervised classification with kmeans
+Before the random forest, let's check what an unsupervised classification can do, so we can see how much (little) random forest improves on it.
+
+## Prepare data for classification
+Let's start by creating a new brick can try with bands 2,3,4,ndvi
+```{r}
+kaze2 <- kaze[[2]]
+covs <- brick(kaze2,kaze3,kaze4,ndvi, ndvi_0)
+plot(covs)
+```
+Relabel all the layers, especially the NDVI for later easy interpretation
+
+```{r}
+names(covs) <- c("band2", "band3", "band4", "NDVI", "NDVI0")
+plot(covs)
+
+```
+
+Run the clustering function kmeans 
+```{r}
+kaz_df <- as.data.frame(covs)  
+set.seed(99)
+cluster_kaz <- kmeans(kaz_df, 5) ### kmeans, with 5 clusters
+str(cluster_kaz)
+
+```
+
+Now, convert the dataframe with cluster information into a raster for plotting with raster() and setValues() functions.
+```{r}
+clusters <- raster(covs)   ## create an empty raster with same extent than kaz
+clusters <- setValues(clusters, cluster_kaz$cluster) # convert cluster values into raster
+clusters
+plot(clusters)
+plot(clusters,col=c("dark green", "brown", "blue", "grey","green"))
+```
+The result is actually pretty good, with water, forest and the bare/urban areas coming clearly out. Water is most differentiated, forest and urban areas a bit mixed, but still outlined. Cropland is a mess, because it combines bare harrowed fields as well as seedlings and young crops and so multiple signatures will need to be fused here.
+
+
+# Supervised Classification with Random Forests
+
+The Random Forest classification algorithm is an ensemble learning method that is used for both classification and regression. In our case, we will use the method for classification purposes. Here, the Random Forest method takes random subsets from a training dataset and constructs classification trees using each of these subsets. Trees consist of branches and leaves.
+
+Branches represent nodes of the decision trees, which are often thresholds defined for the measured (known) variables in the dataset. Leaves are the class labels assigned at the termini of the trees. Sampling many subsets at random will result in many trees being built. Classes are then assigned based on classes assigned by all of these trees based on a majority rule, as if each class assigned by a decision tree were considered to be a vote.
+
+
+## Select and Prepare Training Data for RF model
+Let us do a classification for 2001 using five classes: forest, bare surface, cropland, urban, and water. While cropland is likely to be causing problems due to combination of bare ground and seedlings, and might be best separated into such categories, lets' start simply with water and forest and later we can diversify. A simple classification like this one could be useful, for example, to construct a forest mask for the year 2001.
+```{r}
+## Load the training polygons as a simple features object
+library(sf)
+trainingPoly <- st_read("../data/kaz_training_aggr.shp")
+
+plot(trainingPoly["Descr_en"])
+## Superimpose training polygons onto NDVI plot
+plot(ndvi)
+plot(trainingPoly, add = TRUE)
+```
+Check the labelling of the training polygons
+```{r}
+# the classification is hiding in Descr_bg field
+class(trainingPoly$Descr_bg)
+
+#convert to factor
+trainingPoly$Class <- as.numeric(trainingPoly$Descr_bg)
+trainingPoly
+```
+
+To train the raster data, we need to convert training polygons to the same type, using rasterize(). 
+```{r}
+## Assign 'Class' values to raster cells (where they overlap)
+classes <- rasterize(trainingPoly, ndvi, field='Class')
+plot(classes)
+
+## Plotting
+# Define a colour scale for the classes (as above)
+# corresponding to: cropland, forest, wetland
+cols <- c("light blue", "pink", "green","red", "dark green", "light green", "brown", "yellow")
+
+## Plot without a legend
+plot(classes, col=cols, legend=FALSE)
+## Add a customized legend
+legend("topright", legend=c("water", "urban","meadow","bareground","forest", "seedlings","cropland", "beach"), fill=cols, bg="white")
+```
+The goal in preprocessing these data is to have a table of values representing all layers (covariates) with known values/classes. To do this, we will first need to create a version of our RasterBrick only representing the training pixels. Here, we use the mask() function from the raster package.
+
+```{r}
+covmasked <- mask(covs, classes)
+plot(covmasked)
+```
+
+```{r}
+## Combine this new brick with the classes layer to make our input training dataset
+names(classes) <- "class"
+trainingstack <- addLayer(covmasked, classes)
+plot(trainingstack)
+
+```
+Now we convert these data to a `data.frame` representing all training data. This `data.frame` will be used as an input into the RandomForest classification function. We will use `getValues()` to extract all of the values from the layers of the RasterBrick.
+```{r}
+## Extract all values into a matrix
+valuetable <- getValues(trainingstack)
+valuetable <- na.omit(valuetable)
+
+#Convert the matrix to a data.frame and inspect the first and last 10 rows.
+valuetable <- as.data.frame(valuetable)
+head(valuetable, n = 10)
+tail(valuetable, n = 10)
+```
+Now that the training dataset is a data.frame, let’s convert the class column into a factor (since the values as integers don’t really have a meaning).
+
+
+```{r}
+valuetable$class <- factor(valuetable$class, levels = c(1:8))
+```
+Now we have a convenient training data table which contains, for each of the three defined classes,values for all covariates. Let’s visualize the distribution of some of these covariates for each class. To make this easier, we will create 3 different data.frames for each of the classes. This is just for plotting purposes, and we will not use these in the actual classification.
+
+```{r}
+val_water <- subset(valuetable, class == 1)
+val_urban <- subset(valuetable, class == 2)
+val_forest<- subset(valuetable, class == 5)
+val_beach <- subset(valuetable, class == 8)
+
+## NDVI
+par(mfrow = c(2, 2))
+hist(val_water$NDVI, main = "water", xlab = "NDVI", 
+     xlim = c(-1, 1), ylim = c(0, 4000), col = "blue")
+hist(val_urban$NDVI, main = "urban", xlab = "NDVI", 
+     xlim = c(-1, 1), ylim = c(0, 4000), col = "pink")
+hist(val_forest$NDVI, main = "forest", xlab = "NDVI", 
+     xlim = c(-1, 1), ylim = c(0, 4000), col = "dark green")
+hist(val_beach$NDVI, main = "beach", xlab = "NDVI", 
+     xlim = c(-1, 1), ylim = c(0, 500), col = "yellow")
+
+par(mfrow = c(1, 1))
+```
+
+## Run the Random Forest classification model
+We build the Random Forest model using the training data. For this, we will use the `randomForest` package in R. Using the `randomForest()` function, we will build a model based on a matrix of predictors or covariates (ie. the first 5 columns of valuetable) related to the response (the class column of valuetable).
+```{r}
+## Construct a random forest model
+# Covariates (x) are found in columns 1 to 5 of valuetable
+# Training classes (y) are found in the 'class' column of valuetable
+## Caution: this step takes fairly long!
+# but can be shortened by setting importance=FALSE
+# Check for randomForest package and install if missing
+if(!"randomForest" %in% rownames(installed.packages())){install.packages("randomForest")}
+
+library(randomForest)
+modelRF <- randomForest(x=valuetable[ , c(1:5)], y=valuetable$class, importance = TRUE) # class 3 is missing if you only choose Kaz eastern half..
+?randomForest()
+saveRDS(modelRF,"../data/modelRF.rds")
+
+```
+
+The resulting object from the randomForest() function is a specialized object of class randomForest, which is a large list-type object packed full of information about the model output. Elements of this object can be called and inspected like any list object.
+
+```{r}
+# Inspect the structure and element names of the resulting model
+modelRF
+class(modelRF)
+str(modelRF)
+names(modelRF)
+## Inspect the confusion matrix of the OOB error assessment
+modelRF$confusion
+# to make the confusion matrix more readable
+colnames(modelRF$confusion)[c(1,2,3,9)] <- c("cropland", "forest", "wetland", "class.error")
+rownames(modelRF$confusion) <- c("cropland", "forest", "wetland")
+modelRF$confusion
+```
+Since we set importance=TRUE, we now also have information on the statistical importance of each of our covariates which we can visualize using the varImpPlot() command
+
+```{r}
+varImpPlot(modelRF)
+?importance()
+```
+
+## Apply the RF model and check the Results
+
+Apply the model to the rest of the image and assign classes to all pixels. Note that for this step, the names of the raster layers in the input brick (here covs) must correspond exactly to the column names of the training table. We will use the predict() function from the raster package. This function uses a pre-defined model to predict values of raster cells based on other raster layers. This model can be derived by a linear regression, for example. In our case, we will use the model provided by the randomForest() function.
+
+```{r}
+predLC <- predict(covs, model=modelRF, na.rm=TRUE)
+```
+Plot the results:
+```{r}
+cols <- c("light blue", "pink", "green", "red", "dark green", "light green", "brown", "yellow") # cut out "green" from position 3
+
+## Plot without a legend
+plot(predLC, col=cols, legend=FALSE)
+## Add a customized legend
+legend("topright", legend=c("water", "urban","meadow","bareground","forest", "seedlings","cropland", "beach"), fill=cols, bg="white")  # in position three
+```
+
+```{r}
+writeRaster(predLC, "../data/predLUKaz.tif", format = "GTiff",  overwrite=TRUE)
+```
+
+Evaluate the kmeans and RF model output and discuss the differences and cost/benefit ratio.
+
+
+# Optional: Merging rasters
+With recently captured raster data, you should be able to use the `mosaic()` function to mosaic tiles into a larger image, such as if you want the elevation for the whole of Scandinavia. 
+When `mosaic()` function will not work - often due to the fact that the origins do not match, you can set the tolerance to be higher or use `raster::merge()` instead.
+
+https://gis.stackexchange.com/questions/167445/different-origin-problem-while-merging-rasters
+```{r mosaic}
+library(raster)
+kaze
+kazw
+plotRGB(kaze,stretch= "hist")
+
+# check origin as dissimilar origin with interfere with merging
+origin(kaze)
+origin(kazw)
+
+# a way to increase the tolerance of dissimilar origin
+rasterOptions(tolerance = 0.1)
+
+# merge rasters with high tolerance for dissimilar origin and mean function to reconcile overlapping values  
+kaz <- raster::merge(kazw,kaze, fun = mean,
+                     tolerance = 0.6)
+kaz
+
+# Plot
+plotRGB(kaz, stretch= "hist")
+
+# Save
+writeRaster(kaz, "data/Kazmerged.tif", format = "GTiff",  overwrite=TRUE)
+```
+We see that each half of the image was taken under different atmospheric conditions. Ideally we normalize these spectral profiles before merging to have a more consistent final image.
+```{r}
+library(landsat)
+?histmatch()
+
+hist(kaze)
+hist(kazw)
+
+kwest1 <- histmatch(kaze[[1]], kazw[[1]])
+plotRGB(kwest, stretch = "lin")
+```
