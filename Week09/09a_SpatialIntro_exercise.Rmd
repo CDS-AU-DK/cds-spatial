@@ -1,0 +1,214 @@
+---
+title: "Spatial Statistics - Introduction"
+author: "Adela Sobotkova"
+date: "11/12/2020 updated `r format(Sys.time(), '%B %d, %Y')`" 
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task 1: Simple spatial principles
+For these first few exercises you'll mostly use standard R functions to generate some point patterns.
+
+First, you'll generate 200 points distributed uniformly in a rectangle. The rectangle will have its bottom left corner (xmin and ymin) at coordinate `(0, 0)` and its top right corner (xmax and ymax) at `(1, 2)`, so it is taller than it is wide.
+
+`runif(n, a, b)` will generate `n` random numbers anywhere between `a` and `b`.
+
+## Create some points
+
+* Set the minimum and maximum values of the rectangle in X and Y coordinates.
+* Complete the call to `runif()` to create the X coordinates, and write the similar line for the Y coordinates. Note that `n` is already defined for you.
+
+```{r point generation, eval = FALSE}
+# Define the rectangle
+n = 200
+xmin <- 
+xmax <- 
+ymin <- 
+ymax <- 
+  
+# Generate random point pattern within the rectangle
+x = runif(n, xmin, xmax)
+y = runif(n, ymin, ymax)
+```
+
+
+# Task 2: Plotting areas
+At school you may have been taught to make the most of a piece of graph paper by scaling data to fit the page. R will usually follow this advice by making a plot fill the graphics window.
+
+With spatial data, this can cause misleading distortion that changes the distance and direction between pairs of points. The data in the previous exercise was created in a tall, skinny rectangle, and it should always be shown as a tall, skinny rectangle. If R stretches this to fill a wide graphics window then it is misrepresenting the relationship between events in the up-down and left-right directions.
+
+So spatial plots should have scales so that one unit in the X axis is the same size as one unit on the Y axis. Circles will appear as circles and not ellipses, and squares will appear square.
+
+The ratio of the Y axis scale to the X axis scale is called the *aspect ratio* of the plot. Spatial data should always be presented with an aspect ratio of 1:1.
+
+## Instructions
+
+The boundaries of the rectangle have been pre-defined as `xmin`, `xmax`, `ymin`, and `ymax`. The x and y coordinates of the points have been pre-defined as `x` and `y`, respectively.
+
+* Edit the body of the `mapxy()` function to plot the points using the `x` and `y` vectors.
+* Call `mapxy()` with the correct aspect ratio a to get the map looking right. You should get points in a rectangle twice as high as it is wide.
+
+```{r rectangle, eval=FALSE}
+plot(x,y)
+ls.str()
+mapxy <- function(a = NA){
+  plot(_, _, asp = a)
+  rect(xmin, ymin, xmax, ymax)
+}
+mapxy(__)
+```
+
+Aha! Forcing the aspect ratio to 1 should prevent the distortion of areas.
+
+# Task 3: Quadrat count test for randomness 
+
+Humans tend to see patterns in random arrangements, so we need statistical tests. The quadrat count test was one of the earliest developed spatial statistics methods. It can be used to check if points are completely spatially random; that is, they are uniformly random throughout the area of interest. By running a quadrat count test on the points generated in the previous exercise, you can confirm they were generated uniformly on the circle.
+
+Quadrat count tests are implemented using `quadrat.test()` in spatstat, which takes a planar point pattern, `ppp()` object. "Planar point pattern" is jargon for a set of points in a region of a 2D plane
+
+## Instructions 
+The variables x, y, and radius are set for you.
+
+* Create a new `spatstat` planar point-pattern object
+* Pass the pre-defined x and y values.
+* Use a `disc()` of the right radius as the window.
+* Run the quadrat count test.
+* Plot and print the results. In the plot you'll see the observed and expected number of points in each quadrat as well as a measure of how far above or below the expected number is.
+* **Does the p-value let you reject the null hypothesis?**
+
+```{r quadrat, eval = FALSE}
+# Activate spatstat library
+________
+
+# Some variables have been pre-defined
+ls.str()
+x <-  runif(300, -10,10)
+y <-  runif(300, -10,10)
+radius <- 10
+summary(x)
+
+# Set coordinates and window
+ppxy <- ppp(x = ___, y = ___, window = ___)
+
+# Test the point pattern
+qt <- ___(___)
+
+# Inspect the results
+plot(___)
+print(___)
+```
+
+
+# Task 4: Creating a random point pattern with spatstat
+
+A *Poisson* point process creates events according to a Poisson distribution with an intensity parameter specifying the expected events per unit area. The total number of events generated is a single number from a Poisson distribution, so multiple realizations of the same process can easily have different numbers of events.
+
+In the previous exercise you used a set of 300 events scattered uniformly within a circle. If you repeated the generation of the events again you will still have 300 of them, but in different locations. The dataset of exactly 300 points is from a Poisson point process conditioned on the total being 300.
+
+The `spatstat` package can generate Poisson spatial processes with the `rpoispp()` function given an intensity and a window, that are not conditioned on the total.
+
+Just as the random number generator functions in R start with an "r", most of the random point-pattern functions in `spatstat` start with an "r".
+
+The `area.owin()` function of `spatstat` will compute the area of a window such as a disc.
+
+## Instructions
+
+* Create a disc of radius 10, assigning the result to `disc10`.
+* To generate approximately 500 points in a disc of radius 10, set `lambda` to 500 divided by the `area.owin()` of the disc. Assign the result to `lambda`.
+* Generate a random Poisson point pattern with intensity `lambda` and window `disc10`, assigning the result to `ppois`. Do you get about 500 points?
+* Plot the Poisson point pattern by calling `plot()` on `ppois`.
+
+```{r rpoisson, eval=FALSE}
+# Create a disc of radius 10
+disc10 <- ___
+
+# Compute the rate as count divided by area
+lambda <- ___ / ___
+
+# Create a point pattern object
+ppois <- rpoispp(lambda = ___, win = ___)
+
+# Plot the Poisson point pattern
+___
+```
+
+<br>
+Perfect Poisson process plotting! Poisson processes generate completely spatially random points. Next you'll see some other processes for generating random points.
+
+
+# Task 5: Simulating clustered and inhibitory patterns
+
+The `spatstat` package also has functions for generating point patterns from other process models. These generally fall into one of two classes: clustered processes, where points occur together more than under a uniform Poisson process, and regular (aka inhibitory) processes where points are more spaced apart than under a uniform intensity Poisson process. Some process models can generate patterns on a continuum from clustered through uniform to regular depending on their parameters.
+
+The `quadrat.test()` function can test against clustered or regular alternative hypotheses. By default it tests against either of those, but this can be changed with the `alternative` parameter to create a one-sided test.
+
+A *Thomas* process is a clustered pattern where a number of "parent" points, uniformly distributed, create a number of "child" points in their neighborhood. The child points themselves form the pattern. This is an *attractive* point pattern, and makes sense for modeling things like trees, since new trees will grow near the original tree. Random Thomas point patterns can be generated using `rThomas()`. This takes three numbers that determine the intensity and clustering of the points, and a window object.
+
+Conversely the points of a *Strauss* process cause a lowering in the probability of finding another point nearby. The parameters of a Strauss process can be such that it is a "hard-core" process, where no two points can be closer than a set threshold. Creating points from this process involves some clever simulation algorithms. This is a *repulsive* point pattern, and makes sense for modeling things like territorial animals, since the other animals of that species will avoid the territory of a given animal. Random Strauss point patterns can be generated using `rStrauss()`. This takes three numbers that determine the intensity and "territory" of the points, and a window object. Points generated by a Strauss process are sometimes called *regularly* spaced.
+
+## Instructions
+
+* Create a disc of radius 10, assigning to `disc10`.
+* Generate points from a Thomas process in a disc of radius 10.
+  - Keep the pre-defined values, and pass `disc10` as the window.
+  - Assign to `p_cluster`.
+* Plot the result.
+* Run a quadrat test against a `"clustered"` alternative hypothesis.
+* Do the same for a Strauss process, but test against a `"regular"` point pattern hypothesis.
+
+
+```{r clustering,eval= FALSE}
+# Create a disc of radius 10
+disc10 <- ___
+
+# Generate clustered points from a Thomas process
+set.seed(123)
+p_cluster <- ___(kappa = 0.35, scale = 1, mu = 3, win = ___)
+plot(p_cluster)
+
+# Run a quadrat test
+___(p_cluster, alternative = "___")
+
+# Regular points from a Strauss process
+set.seed(123)
+p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = ___)
+plot(p_regular)
+
+# Run a quadrat test
+___
+```
+
+
+Peachy point pattern generation! Thomas and Strauss processes are important, complementary ways of generating point patterns common in nature.
+<br>
+<br>
+<br>
+
+# Task 6: Point Pattern testing
+
+Two `ppp` objects have been created called `p1` and `p2` in your /data folder. Test if they are clustered or regular, and select the right answer. You'll need to run `quadrat.test` four times, once for each process with each hypothesis.
+
+
+### Possible Answers
+
+1. p1 is regular, p2 is regular
+2. p1 is regular, p2 is clustered 
+3. p1 is clustered, p2 is clustered
+4. p1 is clustered, p2 is regular
+© 2022 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About

@@ -1,0 +1,177 @@
+---
+title: "Testing Bivariate pattern in CPH Baths"
+author: "Adela Sobotkova"
+date: "March-2022 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+This is the final part (statistical test) of the digital component for a course started in the Spring 2022, called City: Between Culture and Nature, taught by Mikkel Thelle and Mikkel Høghøj. 
+In this script, you will combine the historical and modern public bath data for Copenhagen and test these for dis(similarity) using the various cross functions.  
+
+## Libraries
+First load the packages necessary for spatial data visualisation and analysis.
+```{r libraries}
+library(sf)
+library(tidyverse)
+library(spatstat)
+```
+
+## Get data
+```{r}
+baths_hist <- readRDS("../data/baths_hist.rds") # historical baths
+baths_cph <- read_rds("../data/baths_cph.rds")  # baths by suburb centroids 
+baths_osm <- read_rds("../data/baths_osm.rds") # OSM baths
+```
+
+Let's rerun one of the last visualisations (of historical bathouses and modern OSM bathhouses)  in the synced map so we can compare the locations with OSM data.
+```{r}
+library(mapview)
+map_osm <-  mapview(baths_osm, map.types = "OpenStreetMap", 
+        col.regions = "#940000", 
+        #label = as.character(suburbs$name), 
+        color = "white", legend = FALSE, 
+        layer.name = "Public baths, early 21th century (OSM)",
+        homebutton = FALSE, lwd = 0.5) 
+
+map_hist <-  mapview(baths_hist, 
+          map.types = "OpenStreetMap", 
+        col.regions = "#940000", 
+        color = "white", 
+       # cex = "bath_per_km",
+        legend = TRUE, 
+        layer.name = "Public bathhouses, early 20th century",
+        homebutton = FALSE, lwd = 0.5) 
+
+#sync(map_osm,map_hist)
+library(leaflet)
+leaflet() %>% addTiles() %>%
+  addCircleMarkers(data = st_transform(baths_osm, crs = 4326))
+leafsync::sync(map_osm, map_hist)
+```
+
+## Initial Considerations
+Before testing the pattern similarity, we should first check the nature of data:do both patterns represent  *completely mapped data* rather than *sampled data* (where the nature of sampling can affect the comparison)? If the former, one could use nearest neighbour, K-function, or Monte Carlo reassignment.
+
+For a tutorial on Kcross function, see Manny G's contribution to this exchange https://gis.stackexchange.com/questions/4484/comparing-two-spatial-point-patterns#4490
+
+## Convert spatial data into ppp objects
+Before we try some cross-functions, we need to wrangle the data into the right shape for spatstat. 
+Specifically, we first need to combine the two baths datasets into a single marked, or bivariate,  `ppp` object.
+This is a three step process:
+
+* create a list of coordinates, 
+* create a window object for the coordinates
+* assign marks to the different points
+
+Note: st_union did not work as expected (it is multiplying the features), and so I did a workaround and combined the baths sf objects with rbind(). En route I found nd this neat post on unioning using Danish municipalities https://gis.stackexchange.com/questions/278818/fastest-way-to-union-a-set-of-polygons-in-r
+
+The next step is to create a factor column that specifies which point is OSM and which is HIST(orical) for the ppp object 
+
+```{r spatstat}
+library(spatstat)
+
+# Combine the coordinates from both source sf objects
+st_coordinates(baths_hist)  # 21 coordinates
+st_coordinates(baths_osm)   # 177 coordinates
+
+combined <- data.frame(rbind(st_coordinates(baths_hist),
+                  st_coordinates(baths_osm)))
+
+# Assign marks denoting the origin. They need to be a factor
+combined$name <- factor(c(rep("HIST",21), rep("OSM", 177))) 
+
+# Check the result
+combined
+
+# Make the dataframe into an sf object. Note the crs.
+b_combined <- st_as_sf(combined, coords = c("X","Y"), crs = 32632)
+
+# Convert the sf object into a marked ppp and confirm by plotting
+b_ppp <- as.ppp(b_combined) 
+b_ppp
+
+plot(b_ppp)
+
+# Verify that your factor column works by plotting the ppp as a marked object with two values
+plot(split(b_ppp))
+```
+
+## Nearest Neighbour Cross-Function and Simulation
+The way to test for nearest neighbour across the two classes of baths, we randomly reassign marks (H, O) within the combined point dataset and then calculate nearest neighbor between the randomly replaced marked points. Run the simulation 999 times.
+
+```{r nn-sim}
+#create container for simulation data
+nn.sim  <-  vector() 
+
+# Create an identical dataset of planar points/ppp
+b_ppp_r <-  b_ppp
+
+# Reassign labels at random, point locations don't change, and then run nncross() function
+?nncross()
+
+for(i in 1:999){
+  marks(b_ppp_r)  <-  sample(b_ppp$marks)  
+  nn.sim[i]  <-  mean(nncross(split(b_ppp_r)$OSM,split(b_ppp_r)$HIST)$dist)
+}
+```
+
+
+### Compare NN - simulation results visually
+```{r nn-hist}
+hist(nn.sim,breaks=30, main = "Simulating nearest neighbour distances")
+abline(v=mean(nncross(split(b_ppp)$OSM,split(b_ppp)$HIST)$dist),col="red")
+```
+So the majority of simulated points are considerably closer to their neighbours than the points in our dataset, suggesting that O and H data are dispersed. Now that we know about the dispersal, does it apply at all scales?
+
+
+## Ripley-K Cross-Function and Simulation
+
+Maybe we can apply the multi-scale approach to the bathhouses to see if they are dispersed through and through?
+Check out J.Levente's  Ripley K'cross-function [blog](http://blog.jlevente.com/understanding-the-cross-k-function/) and [tutorial](https://github.com/jlevente/publications/tree/master/cross-k). 
+
+```{r kcross}
+?Kcross()
+# Set intervals for moving window (you don't have to)
+rc <- seq(0, 3000, 100)
+
+# Run the Kcross function
+kcross <- Kcross(b_ppp, i="HIST",j="OSM", 
+                 # r=rc,
+                 correction="border") 
+plot(kcross)
+
+```
+How to explain this chart? It seems that the OSM baths cluster around historical baths, or are attracted to them even at distances. Or in other words, the 'O' events are closer to 'H' events than we would expect under complete spatial randomness. 
+
+Look at this chart for explanation https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-statistics/multi-distance-spatial-cluster-analysis.htm 
+
+How do we test for statistical significance? The question here is whether the H and O events are similarly clustered or not? Statistical difference can be tested with MC simulation with random labelling of points as OSM or HIST type (keeping original ratios) and computing the same cross K-function. The simulation mean and the established simulation envelopes tell us whether the observed *between-type* pattern is statistically significant or not.
+```{r simulate-kross-env}
+kmult <- envelope(b_ppp, fun=Kcross,
+                  nsim=100, i="HIST", j="OSM",
+                  r=rc, 
+                  correction='border',
+                  simulate=expression(rlabel(b_ppp)))  # are the two patterns similarly clustered or dispersed at different scales
+
+plot(kmult, main="Cross-K function")
+
+```
+An observed curve within the confidence envelopes means that no matter how we group the points into categories, the pattern we identified in the previous step (by checking on the observed and theoretical values) doesn’t change when randomly assigning events into categories. Here the curve partially (at 500-1700m) falls outside of the confidence envelopes, meaning that there are differences beyond 95% confidence interval between the point categories.
