@@ -71,7 +71,7 @@ plot(x,y)
 ls.str()
 
 mapxy <- function(a = NA){
-  plot(_, _, asp = a)
+  plot(x, y, asp = a)
   rect(xmin, ymin, xmax, ymax)
 }
 
@@ -140,6 +140,7 @@ print(___)
 library(spatstat)
 # Some variables have been pre-defined
 ls.str()
+
 x <-  runif(300, -10,10)
 y <-  runif(300, -10,10)
 radius <- 10
@@ -148,9 +149,10 @@ summary(x)
 # Set coordinates and window
 ppxy <- ppp(x = x, y = y, window = disc(radius))
 
+plot(ppxy)
 # Test the point pattern
 ?quadrat.test()
-qt <- quadrat.test(ppxy, nx = 7, ny = 7)
+qt <- quadrat.test(ppxy)
 
 # Inspect the results
 plot(ppxy)
@@ -198,6 +200,8 @@ ___
 ```{r rpoisson-sol, eval=FALSE}
 # Create a disc of radius 10
 disc10 <- disc(10)
+
+plot(disc10)
 
 # Compute the rate as count divided by area
 lambda <- 500 / area.owin(disc10)
@@ -274,7 +278,7 @@ p_regular <- rStrauss(beta = 2.9, gamma = 0.025, R = .5, W = disc10)
 plot(p_regular)
 
 # Run a quadrat test
-quadrat.test(p_regular, alternative = "regular")
+quadrat.test(p_regular, nx = 6, ny = 6, alternative = "regular")
 ```
 
 

@@ -154,9 +154,9 @@ rc <- seq(0, 3000, 100)
 
 # Run the Kcross function
 kcross <- Kcross(b_ppp, i="HIST",j="OSM", 
-                 # r=rc,
+                 r=rc,
                  correction="border") 
-plot(kcross)
+plot(kcross, . - pi * r^2 ~ r)
 
 ```
 How to explain this chart? It seems that the OSM baths cluster around historical baths, or are attracted to them even at distances. Or in other words, the 'O' events are closer to 'H' events than we would expect under complete spatial randomness. 
@@ -164,14 +164,19 @@ How to explain this chart? It seems that the OSM baths cluster around historical
 Look at this chart for explanation https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-statistics/multi-distance-spatial-cluster-analysis.htm 
 
 How do we test for statistical significance? The question here is whether the H and O events are similarly clustered or not? Statistical difference can be tested with MC simulation with random labelling of points as OSM or HIST type (keeping original ratios) and computing the same cross K-function. The simulation mean and the established simulation envelopes tell us whether the observed *between-type* pattern is statistically significant or not.
+
+## NEEDS FIXING!
 ```{r simulate-kross-env}
+
 kmult <- envelope(b_ppp, fun=Kcross,
                   nsim=100, i="HIST", j="OSM",
                   r=rc, 
                   correction='border',
-                  simulate=expression(rlabel(b_ppp)))  # are the two patterns similarly clustered or dispersed at different scales
+                  simulate=expression(rlabel(b_ppp))
+                  )  # are the two patterns similarly clustered or dispersed at different scales
 
-plot(kmult, main="Cross-K function")
+
+plot(kmult, . - pi * r^2 ~ r, main="Cross-K function")
 
 ```
 An observed curve within the confidence envelopes means that no matter how we group the points into categories, the pattern we identified in the previous step (by checking on the observed and theoretical values) doesn’t change when randomly assigning events into categories. Here the curve partially (at 500-1700m) falls outside of the confidence envelopes, meaning that there are differences beyond 95% confidence interval between the point categories.

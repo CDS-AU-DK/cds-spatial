@@ -116,7 +116,7 @@ hist(nnd_poisson)
 
 # Estimate G(r)
 G_poisson <- Gest(p_poisson)
-
+?Gest()
 # Plot G(r) vs. r
 plot(G_poisson)
 
@@ -125,6 +125,11 @@ nnd_regular <- nndist(p_regular)
 hist(nnd_regular)
 G_regular <- Gest(p_regular)
 plot(G_regular)
+
+G_clustered <- nndist(p_cluster)
+hist(G_clustered)
+G_cluster <- Gest(p_cluster)
+plot(G_cluster)
 ```
 
 G-force! Next you'll learn about `G`'s friends, `F`, `H`,` J`, `K`, and `L`. Notice how `G` for the regular point pattern stays low at small distance, indicating very low probabilities of finding close pairs of points.
