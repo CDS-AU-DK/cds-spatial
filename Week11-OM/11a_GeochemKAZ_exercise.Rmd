@@ -1,0 +1,228 @@
+---
+title: "Exploring Soil Geochemistry "
+author: "Adela Sobotkova"
+date: "30 March 2021 updated `r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sf)
+```
+
+In this exercise, you receive a csv with geochemical soil samples from the Kazanlak valley in Bulgaria. These data are from a systematic stratified sampling campaign in the valley, but the points do not overlap the mounds or the ancient settlements. 
+
+Can you create a continuous layer out of these samples that covers the entire valley and can be used to assess the fertility of soils in the vicinity of the ancient sites? 
+
+## Task 1: Kazanlak geochemical survey data
+Your job is to explore the fertility of soils in Kazanlak and extend the knowledge from sampled locations to the places of interest - the places of past human occupation. Did people choose to settle near nutrient-rich areas in the past or did they stick to lighter soils because nutrient-rich soils were too heavy? 
+
+The Kazanlak geochemistry project collected soil data in a csv called `kaz_geo.csv` , where `OM_muns` column represents the organic matter content on a scale from 0 - 9 with 0 being nutrient-poor and 9 being nutrient-rich. The ancient settlement centroids can be found in `kaz_scatterpoints.shp`.
+
+### Instructions
+
+* Load the geochemical survey data into `kaz_geo` object.
+* Look at the names of columns in the data; is there anything resembling coordinates? What CRS do they look like?
+* Get a summary of the numerical `OM_muns` values and plot the column in a histogram. 
+* Make a map of the `OM_muns` data using ggplot.
+* Load `Kaz_scatterpoints.shp` shapefile into `kaz_sites` sf object  
+* Make a map combining sampled locations `kaz_geo` and the `kaz_sites`. Do they intersect/ Do their extents overlap? 
+
+```{r geo-data, eval = FALSE}
+# Load geo data, spatialize, and transform 
+kaz_geo <- _____
+
+# Load site data and check CRS
+kaz_sites <- _____
+
+# See where the sites are
+
+
+# Get a summary of the organic matter (OM) values
+
+# Look at the distribution
+
+
+# Simple plot of both the sampled and unsampled locations
+plot(__________); plot(__________, col = "red", add =TRUE)
+
+# Ggplot a map of organic matter, showing the values
+ggplot(kaz_geo) +
+  geom_sf(aes(_________)) +
+  geom_sf(data=__________, color = "red")
+
+```
+
+It's a little tricky to see spatial trends from the ggplot. Let's see how we can make the patterns clearer.
+
+
+## Task 2: Fitting a trend surface
+The  data shows OM broadly increasing from south-east to north-west. Fitting a linear model with the coordinates as covariates will interpolate a flat plane through the values.
+
+### Instructions
+
+* Find or create coordinates columns in the geochemical survey dataset, `kaz_geo`.
+* The response, on the left of the `~` sign, is the name of the column we are modeling.
+* The explanatory variables are on the right of the `~` sign, separated by a `+` sign, and are the names of the coordinate columns obtained by `st_coordinates()` in the first step.
+* Fit the model and see if the model parameters are significant by seeing stars in the coefficients table.
+
+
+```{r fit-model, eval=FALSE}
+# Extract the coordinates
+kaz_geo$X <- _____________________
+kaz_geo$Y <- _____________________
+
+# Complete the formula
+m_trend <- lm(___________ , kaz_geo)
+
+# Check the coefficients
+summary(m_trend)
+```
+
+## Task 3: Predicting from a trend surface
+Your next task is to compute the soil nutrient content at the ancient village centroids `kaz_sites`. You can use the `predict()` function on the fitted model `m_trend` from the previous chunk for this to extrapolate the values.
+
+### Instructions
+
+* Create a dataframe with missing data
+  - Start with `kaz_sites` and ensure the dataframe has a similar structure and projection to `kaz_geo`.
+  - Project and write coordinates to `lat`, `long` columns, create `OM` column and populate it with NAs, and relabel TRAP_Code to `ID`.
+  - Assign the result to `kaz_geo_miss`.
+* Next, use the  `predict()` function to return predictions at all the original locations.
+  - Pass the model `m_trend` as the first argument, as usual.
+  - Pass `kaz_geo_miss` to the `newdata` argument to predict missing values.
+  - Assign the result to `predictions`.
+* Fertile soils are those with higher OM. Our linear model gives us estimates and standard deviation based on a normal (Gaussian) assumption. Compute the probability of the soil nutrient content being over 5 (remember the scale of 0-9) using `pnorm()` with the mean and standard deviation values from the prediction data.
+
+```{r predict, eval=FALSE}
+# Create a data frame of missing data
+kaz_geo_miss <- kaz_sites %>% 
+  mutate(X = ______________, 
+         Y = ______________, 
+         OM = ______________, 
+         ID = as.numeric(______)) %>% 
+  dplyr::select(ID, X, Y, OM)
+
+# Predict OM for the missing data
+predictions <- predict(m_trend, 
+                       newdata = __________, 
+                       se.fit = TRUE)
+
+kaz_geo_miss$OM <- predictions$fit
+
+# Compute the exceedance probability
+pFertile <-  1 - pnorm(5, mean = predictions$fit, sd = predictions$se.fit)
+hist(pFertile)
+```
+
+
+Filling in the gaps and calculating exceeding values is an important task in many industries.
+
+Plot the result!
+
+```{r plot-miss, eval = FALSE }
+
+```
+
+Lovely! Now you know what the soil nutrient values at your ancient site centroids would be if estimated through a linear trend following a gaussian distribution. But what if you want to take into account spatial weighting?  Or, what if you wanted to have not only a point but an entire field of values in a certain radius of ancient village centroids?
+
+## Task 4: Variogram estimation
+You will use the `gstat` package to plot variogram clouds and the variograms from data. Recall:
+
+* The *variogram cloud* shows the differences of the measurements against distance for all pairs of data points.
+* The *binned variogram* divides the cloud into distance bins and computes the average difference within each bin.
+
+The `y-range` of the binned variogram is always much smaller than the variogram cloud because the cloud includes the full range of values that go into computing the mean for the binned variogram.
+
+### Instructions
+
+* You should have the geochem survey data, `kaz_geo` in the memory.
+* The gstat `variogram()` function uses the `cloud` argument to plot a variogram cloud. 
+* The data is in meters, so use a 10km cutoff to prevent the cloud from being too dense.
+* Plot a binned variogram of the non-missing data - the default `cloud` parameter is `FALSE`.
+
+```{r binned-vgm, eval = FALSE}
+# Load gstat library
+library(_______)
+
+# Make a cloud from the non-missing data up to 10km
+plot(variogram(OM_muns ~ 1, kaz_geo, 
+               cloud = ______, 
+               cutoff = ______))
+
+# Make a variogram of the non-missing data
+plot(variogram(OM_muns ~ 1, kaz_geo))
+```
+
+In the binned variogram you can see that measurements from sites that are further away from each other are more different.
+
+## Task 5: Variogram with spatial trend
+You might imagine that if soil at a particular point is nutrient-rich, then soil one metre away is likely to be fertile too. But can you say the same thing about soil one kilometre away, or ten kilometres, or one hundred kilometres?
+
+The shape of the previous variogram tells you there is a large-scale trend in the data. You can fit a variogram considering this trend with `gstat`. This variogram should flatten out, indicating there is no more spatial correlation after a certain distance with the trend taken into account.
+
+### Instructions
+* Use the organic matter in survey data, `kaz_geo` 
+* Set the formula for the variogram so that the `OM_muns` value depends on the coordinates.
+
+```{r variogram-spatial, eval = FALSE}
+# Remember what projected coordinates are called?
+
+# The OM_muns depends on the coordinates
+OM_vgm <- variogram(OM_muns ~ X + Y, kaz_geo)
+plot(OM_vgm)
+```
+
+
+The plot first levels off after around 4000m, indicating that there appears to be little spatial correlation beyond that distance. What is that point called?
+
+
+## Task 6: Variogram model fitting
+Next you'll fit a model to your variogram. The `gstat` function `fit.variogram()` does this. You need to give it some initial values as a starting point for the optimization algorithm to fit a better model.
+
+The sill is the the upper limit of the model. That is, the long-range largest value, ignoring any outliers.
+
+### Instructions
+
+* You will be using the `OM_vgm` from the previous exercise.
+* Estimate some parameters by eyeballing the plot.
+  - The `nugget` is the value of the semivariance at zero distance.
+  - The partial sill, `psill` is the difference between the sill and the nugget.
+  - Set the `range` to the distance where the model first begins to flattens out.     
+* Fit a variogram model by calling `fit.variogram()`.
+  - The second argument should take the parameters you estimated, wrapped in a call to `vgm()`.
+* Plot the binned variogram.
+
+```{r vgm-fitting, eval = FALSE}
+# Look at the OM_vgm plot, again. 
+plot(OM_vgm)
+
+# Eyeball the variogram and estimate the initial parameters
+nugget <- ___
+psill <- ____
+range <- ____
+
+# Fit the variogram
+v_model <- fit.variogram(
+  OM_vgm, 
+  model = vgm(
+    model = "Ste",
+    nugget = ____,
+    psill = ____,
+    range = ____,
+    kappa = 0.5
+  )
+)
+
+# Show the fitted variogram on top of the binned variogram
+plot(OM_vgm, model = v_model)
+print(v_model)
+
+```
+
+Plotting a smooth model prediction helps you ignore measurement errors to more easily see the distance at which spatial correlation no longer occurs. You can also apply this model to interpolating the missing values from spatial trends present in existing data, in the next exercise. 
