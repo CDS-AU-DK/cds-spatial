@@ -60,98 +60,125 @@ mun <- st_transform(_____, crs = ____)
 # Check the names
 
 
-# Straighten the names (return here after Task 4)
+# Straighten the names (return here after Task 2)
 
 ```
 
 
 
 # Task 2: Wrangle the attributes and join to the spatial data
-In order to show something we need to connect the spatial polygons with some attributes. Let's pick the civil status table from Denmark Statistik and calculate the total numbers of men and women in each municipality and calculate the percentages for single men and women so that the singles know where to go to find a significant other :). 
+In order to show something we need to connect the spatial polygons with some attributes. Let's grab the election data table from Denmark Statistik and wrangle it so we can join it up with municipalities polygons and subject to adjacency analysis. 
 
-Here we get to practice basic tidyverse functions and the use of `tmap` package.
+Here we get to practice basic tidyverse/tidyr functions.
 
-* Use read_sheet() function from googlesheets4 package to load the prepared election data for 2011, 2015, and 2019
--   remember that gs4_deauth() can help if you have difficulty getting data from GDrive
-* Check the municipality names, paying attention to Aarhus, Vesthimmerlands, etc. Is the spelling of municipality names and election region names the same in all instances?
-*
+* Use `read_sheet()` function from `googlesheets4` package to load the prepared election data for 2011, 2015, and 2019
+-   remember that `gs4_deauth()` can help if you have difficulty getting data from GDrive
+* Check the municipality names, paying attention to Aarhus, Vesthimmerlands, etc. Is the spelling of municipality names and election region names the same between the table data and the spatial data you downloaded in Task 1 ?
+* Find and fix the inconsistent names - learn how to programme your own R operator!
+* Summarize the resulting data
 
 ```{r load-elec}
 # Load the attributes
 gs4_deauth()
+
+
 elec <- read_sheet("https://docs.google.com/spreadsheets/d/1ty3UrUiCK2iqWVk2T2GORaCl0QZ6feUTMmTakXPVIIg/edit#gid=0", col_types = "ccnnn")
 write_csv(elec, "../data/elections.csv")
 
 # Check names
 sort(unique(elec$Region))
 
+# Find inconsistencies
 length(which(unique(elec$Region)%in%unique(mun$NAME_2)))
+
+# Here is a little crutch to find and fix inconsistencies
 '%nin%' <- Negate('%in%')
 missing <- which(unique(elec$Region)%nin%unique(mun$NAME_2))
 unique(elec$Region)[missing]
 
+```
 
 
-# Look at data and summarize
-elec %>% 
-  group_by(Party) %>% 
-  summarize(sum2011 = sum(Y2011),
-            sum2015 = sum(Y2015),
-            sum2019 = sum(Y2019))  %>%
-  janitor::adorn_totals(where = "row")
+Now, after you have fixed the names of the municipalies, review the tabular data and then join it to the spatial data - transferring the data to polygons. Practicing data joining is extremely useful as no data is ever complete and most datasets in the world are relational. You are basically creating a relation now.  
 
+
+* Summarize your data:
+  - You need to know the total electorate in each municipality for 2011, 2015, and 2019 so create a summary dataset `electorate` with three new columns with summaries, eg. `sum2011`, `sum2015`,etc.
+  
+* Look up the  `merge` function to connect polygons with the raw `elec` and summary `electorate` datasets. 
+  - You will need to find a column that the datasets share, so you can join them on the basis of this matching field, e.g. municipality name. It likely has a different column name in each dataset. Supply the specific column names in the `by` argument of the merge function. 
+  
+* Plot the merged results to make sure you have not lost any municipalities. If you have not make the municipality names consistent, some may not have a match and will be dropped.  `mapview()` is the best for interactive review 
+
+* Once you have merged, summarize again:
+  - You need summaries for each municipality by party turnout, ideally as a percentage of local electorate.
+  - Group data by region and party and summarize it by each of the three years, adding three columns for 2011, 2015, and 2019, and calcuating the respective year turnout (for municipality and party) as a percentage of total electorate in that year (calculated earlier and merged into the data) which expresses what percentage of total voters in a given municipality, eg. `pct_vote2011`, `pct_vote2015`,...
+
+* Plot the percentage of Social Democrat turnout in 2015 and 2011. Can you see the change?  
+
+```{r summarize, eval = FALSE}
 # Create total electorate per municipality
 electorate <- elec %>% 
   group_by(Region) %>% 
-  summarize(sum2011 = sum(Y2011),
-            sum2015 = sum(Y2015),
-            sum2019 = sum(Y2019)) 
+  summarize(sum2011 = _______,
+            sum2015 = ________,
+            sum2019 = ________)  
 
 # Merge the spatial polygons with the granular election dataset and the summary
 elections <- mun %>% 
-  select(NAME_2) %>% 
-  merge(elec, by.x = "NAME_2",by.y ="Region") %>% 
-  merge(electorate, by.x = "NAME_2",by.y ="Region") %>% 
-  group_by(NAME_2, Party) %>% 
-  mutate(pct_vote2011 = Y2011/sum2011*100,
-         pct_vote2015 = Y2015/sum2015*100,
-         pct_vote2019 = Y2019/sum2019*100)
+  select(_________) %>% 
+  merge(elec, by.x = _________,by.y =_________) %>% 
+  merge(electorate, by.x = _________,by.y =_________) %>% 
+  group_by(_________, _________) %>% 
+  mutate(pct_vote2011 = _________/_________*100,
+         pct_vote2015 = _________/_________*100,
+         pct_vote2019 = _________/_________*100)
+
 elections
 
 # Map some aspect of the result to see no counties are missing
 elections %>% 
-  group_by(NAME_2) %>% 
+  group_by(_________) %>% 
   filter(grepl("^A", Party)) %>%  # A.Socialdemokratie
-  select(pct_vote2015) %>% 
+  select(_________) %>% 
   mapview()
 
 # Save for later?
 #write_rds(elections, "../data/elections_sp.rds") 
 ```
 
+
 # Task 3: Look at some of the data
-```{r map-data}
+
+Now that we have a well-structured, complete and spatial dataset, let's explore the political preference distribution in space with the help of the lovely `tmap` library!
+
+* Filter your elections data for Social Democrats and Danske Folkeparti (Hint: `grepl()` is a good start)
+* then feed the result into `tm_shape()` and `tm_polygons`, faceting along the way by party. Since you have 2 parties, you should get two visuals.
+* repeat three times, changing the `tm_polygons()` data from `pct_vote2011` to `pct_vote2019`
+
+```{r map-data, eval = FALSE}
 # Let's map the two most popular parties, SD and Danske Folkeparti through time
 library(tmap)
+
 elections %>% 
-  filter(grepl("^A|^O",Party)) %>% 
+  filter(grepl("_________",Party)) %>% 
   tm_shape() + 
   tm_facets("Party", ncol = 2) +
-  tm_polygons("pct_vote2011",
+  tm_polygons(_________,
               title= "Percentage of Votes \nin 2011")
 
 elections %>% 
-  filter(grepl("^A|^O",Party)) %>% 
+  filter(grepl("_________",Party)) %>% 
   tm_shape() + 
   tm_facets("Party") +
-  tm_polygons("pct_vote2015",
+  tm_polygons(_________,
               title= "Percentage of Votes \nin 2015")
 
 elections %>% 
-  filter(grepl("^A|^O",Party)) %>% 
+  filter(grepl("_________",Party)) %>% 
   tm_shape() + 
   tm_facets("Party") +
-  tm_polygons("pct_vote2019",
+  tm_polygons(_________,
               title= "Percentage of Votes \nin 2019")
 ```
 
@@ -176,45 +203,54 @@ The `elections` sf object should be already loaded in your environment.
 * Plot the `pct_vote2015` percentage on the cartogram. Notice how some areas have relatively shrunk or grown.
 
 ```{r cartogram-DF, eval=FALSE}
-
-```
-
-Copacetic cartogram! Now try to rerun the cartogram for the Social Democrats in 2015
-```{r carto-SD}
-# Let's look at Social Democrats in 2015
-DKSD <- elections %>% 
-  filter(grepl("^A",Party)) 
-
-# Make a cartogram, scaling the area to the total number of votes cast in 2015
-electorate2015 <- cartogram_cont(DKSD, "sum2015")
-
-# Now check the linearity of the total voters per municipality plot
-plot(electorate2015$sum2015, st_area(electorate2015, byid = TRUE))
-
-# Make a cartogram, scaling the area to the percentage of SD voters
-DF2015 <- cartogram_cont(DKSD, "pct_vote2015")
+# Let's look at Danske Folkeparti in 2015
+DF <- elections %>% 
+  filter(grepl(_________, Party))
+  
+# Make a cartogram, scaling the area to the percentage of DF voters
+DF2015 <- _________(DF, "pct_vote2015")
 
 # Check the linearity of the SD voters percentage per municipality plot
-plot(DF2015$pct_vote2015, st_area(DF2015, byid = TRUE))
+plot(_________$pct_vote2015, st_area(_________, byid = TRUE))
+```
+
+Copacetic cartogram! Now try to rerun the cartogram for the Social Democrats in 2015 and create a visual for both parties' turnout and total electorate in 2015.
+
+```{r carto-SD, eval = FALSE}
+# Let's look at Social Democrats in 2015
+DKSD <- elections %>% 
+  filter(_________) 
+
+# Make a cartogram, scaling the area to the total number of votes cast in 2015
+SD2015 <- _________(DKSD, "sum2015")
+
+# Compare the linearity of the total voters per municipality cartogram as opposed to the reality
+plot(_________$sum2015, st_area(_________, byid = TRUE)) # reality
+plot(_________$sum2015, st_area(_________, byid = TRUE)) # cartogram
 
 
-# Make a adjusted map of the 2015 SD voters
+# Make a adjusted map of the 2015 SD and DF voters
 plot(electorate2015$geometry, 
      col = "beige",
      main = "Electorate in DK municipalities 2015")
-plot(DF2015$geometry,
+plot(_________,
      col="pink",
      main = "% of Social Democrat votes across DK in 2015")
+plot(_________,
+     col="lightblue",
+     main = "% of Danske Folkeparti votes across DK in 2015")
 ```
 
 
 # Task 5: Spatial autocorrelation test
 If we look at the facetted tmaps the election results in 2015 seem to have spatial correlation - specifically the percentage of voters favoring Danske Folkeparti increases as you move towards the German border. This trend is not as visible in the cartogram, where the growth is more apparent in Sjæland, and other islands, like Samsø. 
-How much correlation is there, really?
-By correlation, we mean : pick any two kommunes that are neighbors - with a shared border - and the chances are they'll be more similar than any two random municipalities. 
-This can be a problem when using statistical models that assume, conditional on the model, that the data points are independent.
 
-The `spdep` package has functions for measures of spatial correlation, also known as spatial dependency. Computing these measures first requires you to work out which regions are neighbors via the `poly2nb()` function, short for "polygons to neighbors". The result is an object of class `nb`. Then you can compute the test statistic and run a significance test on the null hypothesis of no spatial correlation. The significance test can either be done by Monte-Carlo or theoretical models.
+How much similarity and spatial dependence is there, really?
+
+By similarity or positive correlation, we mean : pick any two kommunes that are neighbors - with a shared border - and their attributes will be more similar than any two random municipalities. 
+Such autocorrelation or spatial dependence can be a problem when using statistical models that assume, conditional on the model, that the data points are independent.
+
+The `spdep` package has functions for measures of spatial autocorrelation, also known as spatial dependency. Computing these measures first requires you to work out which regions are neighbors via the `poly2nb()` function, short for "polygons to neighbors". The result is an object of class `nb`. Then you can compute the test statistic and run a significance test on the null hypothesis of no spatial correlation. The significance test can either be done by Monte-Carlo or theoretical models.
 
 In this example you'll use the Moran "I" statistic to test the spatial correlation of the Danske Folkeparti voters in 2015.
 
@@ -265,23 +301,23 @@ Now that your neighbors are determined and centroids are computed, let's continu
   - You will need another argument in both spatial weights and at the level of the test. `zero.policy= TRUE` deals with situations when an area has no neighbors based on your definition of neighbor (many islands in Denmark). When this happens and you don’t include `zero.policy= TRUE`, you’ll get the following error
   - Run the test against the theoretical distribution of Moran's I statistic. Find the p-value. Can you reject the null hypothesis of no spatial correlation?
 * Inspect a map of `pct_2011`.
-* Run another Moran I statistic test, this time on the percent of single women.
+* Run another Moran I statistic test, this time on Social Democrats.
   - Use 999 Monte-Carlo iterations via `moran.mc()`.
   - The first two arguments are the same as for `moran.test()`.
   - You also need to pass the argument `nsim = 999`.
   - Note the p-value. Can you reject the null hypothesis this time?
   
 ```{r Moran-DF-contig, eval = FALSE}
-# Let's look at Danske Folkeparti in 2015
+# Let's look at Danske Folkeparti 
 DF <- elections %>% 
   filter(grepl("^O",Party))
 
-# Run a Moran I test on 2015 DF vote
+# Run a Moran I test on 2011 DF vote
 moran.test(DF$______, 
            _______(________, style = "W",zero.policy=TRUE),
            zero.policy=TRUE)
 
-# Run a Moran I test on 2011 DF vote
+# Run a Moran I test on 2015 DF vote
 moran.test(DF$______, 
            _______(________, style = "W",zero.policy=TRUE),
            zero.policy=TRUE)
@@ -291,49 +327,25 @@ moran.mc(DF$______,
            _______(________, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
 ```
 
-
-```{r Moran-DF-contig-sol, echo = FALSE}
-# Let's look at Danske Folkeparti in 2015
-DF <- elections %>% 
-  filter(grepl("^O",Party))
-
-# Run a Moran I test test on 2015 DF vote
-moran.test(DF$pct_vote2015, 
-           nb2listw(nb, style = "W",zero.policy=TRUE),
-           zero.policy=TRUE)
-
-# Run a Moran I test test on 2011 DF vote
-moran.test(DF$pct_vote2011, 
-           nb2listw(nb, style = "W",zero.policy=TRUE),
-           zero.policy=TRUE)
-
-# Do a Monte Carlo simulation to get a better p-value
-moran.mc(DF$pct_vote2015,nb2listw(nb, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
-```
-
 Marvellous Moran Testing! You should have found that the p-value was around 0.079 in 2015 and 0.15 in 2011 the first case, thus you did not find any significant spatial correlation. In Monte Carlo simulation, the p-value was around 0.053, so you did find some not very significant spatial correlation (strongly positive).
 
 ### Repeat the same test for Social Democrats
-```{r Moran-SD}
-# Let's look at Social Democrats
-DKSD <- elections %>% 
-  filter(grepl("^A",Party))
-
-# Run a Moran I test on total population of women
-moran.test(DKSD$pct_vote2015, 
-           nb2listw(nb, style = "W",zero.policy=TRUE),
+```{r Moran-SD, eval =FALSE}
+# Run a Moran I test on percentage of SD turnout in 2011
+moran.test(_________, 
+           _________(nb, style = "W",zero.policy=TRUE),
            zero.policy=TRUE)
 
-# Run a Moran I test on the proportion of single women
-moran.test(DKSD$pct_vote2011, 
-           nb2listw(nb, style = "W",zero.policy=TRUE),
+# Run a Moran I test on percent of SD turnout in 2015
+moran.test(_________, 
+           _________(nb, style = "W",zero.policy=TRUE),
            zero.policy=TRUE)
 
 # Do a Monte Carlo simulation to get a better p-value
-moran.mc(DKSD$pct_vote2011,nb2listw(nb, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
+moran.mc(DKSD$pct_vote2011,_________(nb, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
 
 # Do a Monte Carlo simulation to get a better p-value
-moran.mc(DKSD$pct_vote2015,nb2listw(nb, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
+moran.mc(DKSD$pct_vote2015,_________(nb, zero.policy=TRUE),zero.policy=TRUE, nsim = 999)
 ```
 
 Phenomenal political testing. Social Democrats show even less correlation. P-value in Moran I test is was around 0.13 in 2011 results and 0.24 in 2015 results, thus no significant spatial correlation. In Monte Carlo simulation, the p-value was around 0.24, suggesting there is insignificant (positive) spatial correlation.
@@ -414,7 +426,7 @@ moran.test(DF$_____,
            zero.policy=TRUE)
 
 # Run a Moran I test on Dansk Folkeparti votes in 2011 based on 3 neighbors
-moran.test(DF$DF$_____,
+moran.test(DF$_____,
            ________(knn2nb(k3), style = "W",zero.policy=TRUE),
            zero.policy=TRUE)
 
