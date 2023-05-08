@@ -13,6 +13,7 @@ p_load(sf, raster, dplyr, tmap, ggplot2, tidyverse, lubridate, sp, gstat, ggthem
 ```
 
 ### Loading nitrate data:
+If you have difficulty running the download.sh script (e.g it is timing out or similar), use this [sciencedata link](https://sciencedata.dk/themes/deic_theme_oc7/apps/files_sharing/public.php?t=190154e3aa98e3c9dc0cfe726d355963&) to download a zipped archive and extract it into a data/ folder inside Week 11
 ```{r, results='hide'}
 # Load the .csv-file as a dataframe and save it as "nitrate":
 nitrate <- as.data.frame(read_csv("data/nitrate.csv")) 
