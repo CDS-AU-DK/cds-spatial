@@ -6,22 +6,19 @@
 ## beware that some need extra options specified
 
 # Packages
-install.packages("leaflet")
-install.packages("htmltools") 
-install.packages("googlesheets4")
+pacman::p_load("leaflet", "htmltools", "googlesheets4")
 
 # Example with Markers
-library(leaflet)
 
 popup = c("Robin", "Jakub", "Jannes")
 
 leaflet() %>%
-  addProviderTiles("Esri.WorldPhysical") %>% 
+  addProviderTiles("Esri.WorldPhysical") %>% # "layout"
  #addProviderTiles("Esri.WorldImagery") %>% 
-  addAwesomeMarkers(lng = c(-3, 23, 11),
-                    lat = c(52, 53, 49), 
+  addAwesomeMarkers(lng = c(-3, 23, 11), # lng = longitude (around eqvater)
+                    lat = c(52, 53, 49),  # lat = latitude (up / down)
                     popup = popup)
-
+# We can see the specified markers
 
 ## Sydney with setView
 leaflet() %>%
@@ -29,6 +26,8 @@ leaflet() %>%
   addProviderTiles("Esri.WorldImagery", 
                    options = providerTileOptions(opacity=0.5)) %>% 
   setView(lng = 151.005006, lat = -33.971, zoom = 10)
+# more details and you can zoom more in
+# opacity = gennemsigtighed
 
 
 # Europe with Layers
@@ -42,6 +41,10 @@ leaflet() %>%
 addLayersControl(
   baseGroups = c("Geo","Aerial", "Physical"),
   options = layersControlOptions(collapsed = T))
+
+# first we see the "Esri.WorldPhysical", then the next layer (the more we zoom in) 
+# we see the next tile "Esri.WorldImagery", and so on...
+# the tiles are ordered after the baseGroups and layersControlOptions
 
 # note that you can feed plain Lat Long columns into Leaflet
 # without having to convert into spatial objects (sf), or projecting
@@ -61,6 +64,7 @@ l_aus <- leaflet() %>%   # assign the base location to an object
   setView(151.2339084, -33.85089, zoom = 13)
 
 esri <- grep("^Esri", providers, value = TRUE)
+# We don't specify the providerTiles, as we want that in a pop-up box
 
 for (provider in esri) {
   l_aus <- l_aus %>% addProviderTiles(provider, group = provider)
@@ -69,8 +73,12 @@ for (provider in esri) {
 AUSmap <- l_aus %>%
   addLayersControl(baseGroups = names(esri),
                    options = layersControlOptions(collapsed = FALSE)) %>%
+  # the code above specifies the ProviderTiles and creates a pop-up box where we
+  # can change the ProviderTiles. So if one comments it out, the plot will just be
+  # grey and without the box, where we can change theme
   addMiniMap(tiles = esri[[1]], toggleDisplay = TRUE,
              position = "bottomright") %>%
+  # MiniMap = small map in the corner
   addMeasure(
     position = "bottomleft",
     primaryLengthUnit = "meters",
@@ -88,6 +96,7 @@ AUSmap <- l_aus %>%
 addControl("", position = "topright")
 
 AUSmap
+
 ################################## SAVE FINAL PRODUCT
 
 # Save map as a html document (optional, replacement of pushing the export button)
