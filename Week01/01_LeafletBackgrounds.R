@@ -20,12 +20,12 @@ leaflet() %>%
                     popup = popup)
 # We can see the specified markers
 
-## Sydney with setView
+## Aarhus with setView
 leaflet() %>%
   addTiles() %>%
   addProviderTiles("Esri.WorldImagery", 
                    options = providerTileOptions(opacity=0.5)) %>% 
-  setView(lng = 151.005006, lat = -33.971, zoom = 10)
+  setView(lng = 10.1925401, lat = 56.144414, zoom = 10)
 # more details and you can zoom more in
 # opacity = gennemsigtighed
 
@@ -108,6 +108,17 @@ saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
 #
 # Task 1: Create a Danish equivalent with esri layers, call it DKmap
 #
+#  -  change the coordinates lng = 10.1925401 and lat = 56.144414
+
+DKmap <- leaflet() %>%
+  addTiles() %>%
+  addProviderTiles("Esri.WorldImagery", 
+                   options = providerTileOptions(opacity=0.5)) %>% 
+  setView(lng = 8.9040026, lat = 56.2050512, zoom = 6)
+DKmap
+saveWidget(DKmap, "DKmap", selfcontained = TRUE)
+
+#
 # Task 2: Start collecting spatial data into a spreadsheet: https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479
 #
 #
@@ -119,7 +130,7 @@ library(leaflet)
 
 # gs4_deauth() # if the authentication is not working for you
 
-places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479",
+places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1851726955",
                      range = "SA2024",
                      col_types = "cccnncnc")
 glimpse(places)
@@ -132,8 +143,15 @@ leaflet() %>%
 
 #########################################################
 #
-# Task 3: Read in the googlesheet data you and your colleagues populated with data and display it over your DKmap . 
+# Task 3: Read in the googlesheet data you and your colleagues populated with
+# data and display it over your DKmap . 
 # The googlesheet is at https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479
+
+DKmap %>% 
+  addTiles() %>% 
+  addMarkers(lng = places$Longitude, 
+             lat = places$Latitude,
+             popup = places$Description)
 
 #########################################################
 
