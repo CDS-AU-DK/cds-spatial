@@ -6,7 +6,7 @@
 ## beware that some need extra options specified
 
 # Packages
-pacman::p_load("leaflet", "htmltools", "googlesheets4")
+pacman::p_load("leaflet", "htmltools", "googlesheets4", "tidyverse")
 
 # Example with Markers
 
@@ -154,4 +154,15 @@ DKmap %>%
              popup = places$Description)
 
 #########################################################
+
+# Task 4: ChicagoCrimes
+
+CC_data <- read_csv('/Users/Administrator/Documents/Semester6/Spatial/cds-spatial/Week01/data/ChicagoCrimes2017.csv')
+
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(lng = CC_data$Longitude, 
+             lat = CC_data$Latitude,
+             popup = CC_data$Description,
+             clusterOptions = 1)
 
