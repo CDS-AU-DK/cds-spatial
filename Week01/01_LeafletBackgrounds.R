@@ -7,11 +7,11 @@
 
 # Packages
 install.packages("leaflet")
-install.packages("htmlwidget")
+install.packages("htmltools") 
+install.packages("googlesheets4")
 
 # Example with Markers
 library(leaflet)
-library(htmlwidgets)
 
 popup = c("Robin", "Jakub", "Jannes")
 
@@ -92,6 +92,7 @@ AUSmap
 
 # Save map as a html document (optional, replacement of pushing the export button)
 # only works in root
+library(htmlwidgets) # from htmltools
 
 saveWidget(AUSmap, "AUSmap.html", selfcontained = TRUE)
 #########################################################
@@ -110,7 +111,7 @@ library(leaflet)
 # gs4_deauth() # if the authentication is not working for you
 
 places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479",
-                     range = "SA2022",
+                     range = "SA2024",
                      col_types = "cccnncnc")
 glimpse(places)
 
