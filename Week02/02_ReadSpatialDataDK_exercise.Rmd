@@ -50,28 +50,42 @@ In this exercise you will read in three shapefiles (parks, playgrounds, and fore
 
 ```{r load, eval=FALSE, echo=TRUE}
 # Load the sf package
-___(___)
+pacman::p_load(sf)
 
 # Read in the forests shapefile
-forests <- ___("../data/forests.shp")
+forests <- read_sf("../data/forests.shp")
 
 # Read in the parks shapefile
-parks <- ___(___)
+parks <- read_sf("../data/playgrounds4326.shp")
 
 # Read in the playgrounds shapefile
-playgrounds <- ___(___)
+playgrounds <- read_sf("../data/parks.shp")
 
 # Read in the shelters json
-shelters <- ___(___)
+shelters <- read_sf("../data/shelters.json")
 
 # View the first few features of all layers
-___(___)
+head(forests)
+head(parks)
+head(playgrounds)
+head(shelters)
 ```
 
 ## Questions: 
 
 1. How many features does each layer contain and what kind of geometry are they?
+*FORESTS*: 32 features, MULTIPOLYGON
+*PARKS*: 51 features, POINT
+*PLAYGROUNDS*: 47 features, MULTIPOLYGON
+*SHELTHERS*: 19 features, POINT
+
+(note for comprehension: features are observations (rows), and fields are variables (columns))
+
 2. What is the CRS value in these objects?
+*FORESTS*: (Projected CRS) ETRS89 
+*PARKS*: NA
+*PLAYGROUNDS*: (Projected CRS) ETRS89
+*SHELTHERS*: (Projected CRS) ETRS89
 
 
 Well done, now you should see how easy it can be to read in shapefiles and you got your first taste of what an sf object looks like.
@@ -92,14 +106,12 @@ Spatial objects in `sf` are just data frames with some special properties. This 
 * Use the `head()` function to check which variables exist in your new data frame. Does the data frame only have the `navn` and `areal_m2` columns (the answer is no, why)?
 
 ```{r wrangle-parks, eval=FALSE, echo=TRUE}
-# Load the sf package
-___
-
-# ... and the dplyr package
-___
+# load the dplyr package
+pacman::p_load(dplyr)
 
 # Use filter() to limit to over5ha parks
-___
+over5ha_parks <- parks %>% 
+  filter()
 
 # Count the number of rows
 ___(over5ha)
