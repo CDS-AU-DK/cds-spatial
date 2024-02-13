@@ -55,19 +55,19 @@ pacman::p_load(sf)
 # Read in the forests shapefile
 forests <- read_sf("../data/forests.shp")
 
-# Read in the parks shapefile
-parks <- read_sf("../data/playgrounds4326.shp")
-
 # Read in the playgrounds shapefile
-playgrounds <- read_sf("../data/parks.shp")
+playgrounds <- read_sf("../data/playgrounds4326.shp")
+
+# Read in the parks shapefile
+parks <- read_sf("../data/parks.shp")
 
 # Read in the shelters json
 shelters <- read_sf("../data/shelters.json")
 
 # View the first few features of all layers
 head(forests)
-head(parks)
 head(playgrounds)
+head(parks)
 head(shelters)
 ```
 
@@ -75,16 +75,16 @@ head(shelters)
 
 1. How many features does each layer contain and what kind of geometry are they?
 *FORESTS*: 32 features, MULTIPOLYGON
-*PARKS*: 51 features, POINT
-*PLAYGROUNDS*: 47 features, MULTIPOLYGON
+*PARKS*: 47 features, MULTIPOLYGON
+*PLAYGROUNDS*: 51 features, POINT
 *SHELTHERS*: 19 features, POINT
 
-(note for comprehension: features are observations (rows), and fields are variables (columns))
+(note for comprehension: features are observations (rows), and fields are more or less variables (columns), BUT the geometry "column" is not counted as a field)
 
 2. What is the CRS value in these objects?
 *FORESTS*: (Projected CRS) ETRS89 
-*PARKS*: NA
-*PLAYGROUNDS*: (Projected CRS) ETRS89
+*PARKS*: (Projected CRS) ETRS89
+*PLAYGROUNDS*: NA
 *SHELTHERS*: (Projected CRS) ETRS89
 
 
@@ -111,16 +111,17 @@ pacman::p_load(dplyr)
 
 # Use filter() to limit to over5ha parks
 over5ha_parks <- parks %>% 
-  filter()
+  filter(areal_m2>50000)
 
 # Count the number of rows
-___(over5ha)
+nrow(over5ha_parks) #17 rows
 
 # Limit to navn and areal_m2 variables
-over5_lim <- over5ha %>% ___(navn, areal_m2) 
+over5_lim <- over5ha_parks %>% 
+  select(navn, areal_m2) #keeps geometry column by default even though it is not specified
 
 # Use head() to look at the first few records
-___(over5_lim)
+head(over5_lim)
 ```
 
 Great! You can see why the `sf` package is so nice – your spatial objects are data frames that you can smoothly manipulate with `dplyr`. The number of parks over 5ha is 17
@@ -145,20 +146,20 @@ In this exercise, you will convert the data frame to what's called a `tibble` wi
 
 ```{r geometry, eval = FALSE, echo = TRUE}
 # Create a standard, non-spatial data frame with one column
-df <- ___(a = 1:3)
+df <- data.frame(a = 1:3)
 
 # Add a list column to your data frame
-df$b <- ___(1:4, 1:5, 1:10)
+df$b <- list(1:4, 1:5, 1:10)
 
 # Look at your data frame with head
-___(df)
+head(df)
 
 # Convert your data frame to a tibble and print on console
-___(df)
+as_tibble(df)
 
 # Pull out the third observation from both columns individually
-df$___[___]
-df$___[___]
+df$a[3]
+df$b[3]
 ```
 You now have a better sense of what a list column is. You can see how it can be used to store far more information in a single variable than other types of columns. These list-columns are how `sf` stores detailed geographic information on each feature in a single record. Converting the data frame to a tibble is not necessary but a tibble can provide a better print out of the object.
 
@@ -205,16 +206,16 @@ length(which(result > val))
 
 ```{r forests, eval=FALSE, echo=TRUE}
 # Compute the areas of the forests
-areas <- ___(forests)
+areas <- st_area(forests)
 
 # Create a quick histogram of the areas using hist
-___(___)
+hist(areas)
 
 # Filter to forests greater than 200000 (square meters)
-big_forests <- ___ %>% ___(___(___) > 200000)
+big_forests <- forests %>% filter(areal_m2 > 200000)
 
 # Can you plot the big_forests with their names??(hint: check the plotting section in Task 5 below)
-
+plot(big_forests["navn"])
 
 # Plot just the geometry of big_forests
 ___(___(big_forests))
