@@ -50,7 +50,7 @@ In this exercise you will read in three shapefiles (parks, playgrounds, and fore
 
 ```{r load, eval=FALSE, echo=TRUE}
 # Load the sf package
-___(___)
+library(sf)
 
 # Read in the forests shapefile
 forests <- ___("../data/forests.shp")
