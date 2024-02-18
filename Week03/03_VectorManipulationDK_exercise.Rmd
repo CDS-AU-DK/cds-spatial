@@ -1,0 +1,233 @@
+---
+title: "Week 03 - Bounding boxes, Buffers, Centroids and Spatial Joins"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Task 1: Create spatial data and buffer layers
+
+Computing buffers is a key spatial analysis skill and the resulting buffers have a wide range of uses like, for example, identifying the number of roads within one kilometer of a school or computing the number of hazardous waste sites near sensitive natural areas.
+
+Although, technically you can buffer data with unprojected coordinate reference systems, the buffer distance will be more meaningful with a projected CRS so it is highly recommended that you transform unprojected data to a projected CRS before buffering.
+
+## Instructions
+
+* Load the packages `sf` and `raster`along with the objects `df`, `shelters`, and `aarhus` in your workspace.
+* Use `st_as_sf()` to convert this data frame to an `sf` object, use 4326 for the `crs` argument because these points are latitude/longitude -- an unprojected CRS.
+* Use `st_transform()` to transform the points' CRS to match the `shelters`  so we can plot them together. You will need the `st_crs()` function to get the CRS of the `shelters` or use the EPSG 25832.
+* Buffer both the `shelters` and your points by 500 meters (no need to specify "meters", since this is the projection unit, this will be the default). The radius argument is `dist`.
+* Plot the `shelters`, shelter buffers,  `aarhus` image, and the geometries of buffers and points together. This will require running `plot()`,`plot()`, `plotRGB()`, and `plot()` again, all together.
+
+```{r buffer, eval=FALSE}
+# Create dataframe with lat long data
+df <- data.frame(place = c("Aarhus Domkirke", 
+                           "Christianskirken",
+                           "Nobelparken"),
+                 longitude=c(10.2102364,10.1949197,10.2033485),
+                 latitude=c(56.1574919,56.1772228,56.174346))
+
+
+# Convert the data frame to an sf object             
+df_sf <- ___(df, coords = c("longitude", "latitude"), ___)
+
+# Transform the points to match the shelters' CRS EPSG 25832
+df_crs <- st_transform(df_sf, crs = 25832)
+
+# Buffer the points
+df_buf <- _____(df_crs, dist = 500)
+
+# Load shelters and buffer them by 500m
+shelters <- 
+shelters_buf <- _____(shelters, _____)
+
+
+# Load the aarhus image
+
+
+# Plot the shelters and buffers, aarhus image and points and their buffers
+_____(______(shelters_buf), col = "green")
+_____(_______(shelters), pch = 2 ,add = TRUE)
+_____(aarhus, stretch = "lin",add = TRUE)
+_____(______(df_buf), col = "firebrick",add = TRUE)
+_____(______(df_crs), pch = 16, add = TRUE)
+
+```
+
+
+Congratulations! Buffering is pretty straightforward in `sf`. The hardest part is probably getting your data into R and ensuring that they have the right coordinate reference system. The map is far from splendid, but having all the objects there is a success :)
+
+# Task 2: Compute polygon centroids
+Similar to buffering, computing polygon centroids is a bedrock geoprocessing task used to assign values and even to help with labeling maps. The function for this in sf is `st_centroid()`.
+
+Also similar to buffering, centroid calculations should generally be performed on data with a projected coordinate reference system.
+
+## Instructions
+
+* Read in the `municipalities` shapefile from GADM database (see Bonus in Week 02). Note the 32618 CRS.
+* Project/transform the `municipalities` using the EPSG number 25832 as the target CRS. As the municipalities is a SpatialPolygons Dataframe, you will need to use `st_as_sf()` to convert it to `sf` object first.
+* Compute the centroids with `st_centroid()` and store as an object named `centroids`. Only one argument is required.
+* Plot the geometry of `municipalities` object with the centroids on top. This requires two calls to `plot()` run together. The second will need `add = TRUE`.
+
+```{r centroids, eval=FALSE}
+# Read in the municipality shapefile
+municipalities <- ___
+
+# Convert municipalities to sf object and project to epsg 25832
+municipalities_25832 <- ___(__________(municipalities), crs = _____)
+
+# Compute the municipality centroids
+centroids <- ___(municipalities_25832)
+
+# Plot the municipality geometry
+plot(___(municipalities_25832), col = "grey", border = "white")
+plot(centroids, pch = 16, col = "firebrick", ___ = ___)
+```
+
+
+Complete! You will find that knowing how to compute polygon centroids will serve you well in many contexts, from attaching labels to polygons in R to calculating neighborhoods and distances.
+
+# Task 3: Create a bounding box around vector data
+You can compute bounding boxes around vector data using `sf`. These can help you, for example, create polygons to clip layers to a common area for an analysis (e.g to limit area to aarhus municipality) or identify regions of influence.
+
+In the `sf` package, there is a function for extracting the bounding box coordinates, if that's all you need, this is `st_bbox()`. More likely you'll want to create a new `sf` object (a polygon) from those coordinates and to do this `sf` provides the `st_make_grid()` function.
+
+`st_make_grid()` can be used to make a multi-row and multi-column grid covering your input data but it can also be used to make a grid of just one cell (a bounding box). To do this, you need to specify the number of grid cells as `n = 1`.
+
+## Instructions
+
+* Filter out Aarhus kommune from the `municipalities_25832` sf object and create a new `aarhus_mun` object. How exactly is Aarhus spelled and which column do you use? 
+* Review that your selection worked by plotting `shelters` over the `aarhus_mun` object - they should overlap.
+* Compute the bounding box coordinates with `st_bbox()`. What is the result?
+* Create a single polygon bounding box around the aarhus municipality using `st_make_grid()` with an argument of `n = 1`.
+* Create a plot of the `municipalities`, highlighting the aarhus municipality and `aarhus_box` (just the geometry), the new box on top of it. 
+* Create a second plot with the `aarhus_box` and `shelters` on top of the aarhus ortophoto.
+
+```{r Ar-box, eval= FALSE}
+# Filter out the Aarhus kommune from the municipalities sf object
+aarhus_mun <- _______________ %>% 
+  filter(____________)
+
+# Plot the aarhus municipality and the shelters
+plot(_______(aarhus_mun), col = "grey", border = "white")
+plot(________, add = TRUE, pch = 16, col = "forestgreen")
+
+# Compute the coordinates of the bounding box
+_________(aarhus_mun)
+
+# Create a bounding box polygon
+aarhus_box <- __________(aarhus_mun, n = ______)
+
+# Plot all the DK municipalities, add the shelters and the new box outlining the Aarhus municipality
+plot(st_geometry(municipalities_25832), col = "grey", border = "white")
+plot(________, _________, pch = 16, col = "forestgreen")
+plot(________, _________)
+```
+
+
+Bounding box completed! You can see in the plot that the bounding box is the minimum rectangular polygon that fits all the shelters. You might now clip a series of layers to this box for a consistent extent over the Aarhus municipality. You will learn how to do this in a later exercise.
+
+
+# Task 4: Dissolve multiple features into one
+In order to compute a tighter bounding box, **a convex hull**, around a set of points like the shelters or other features, which do not neatly fit a rectangular shape you'll need to learn one more function first.
+
+For points, remember and beware that the convex hull function creates a boundary around **each** point! This is unlikely what you want. More likely you want to compute a convex hull around all your points. If you have a set of points and you want to draw a convex hull around them you first need to bundle the points into a single MULTIPOINT feature and in order to do this you will use the dissolve function in `sf` called `st_union()`.
+
+With polygons, `st_union()` will dissolve all the polygons into a single polygon representing the area where all the polygons overlap. Your set of individual points will be dissolved/unioned into a single, MULTIPOINT feature that you can use for tasks like computing the convex hull.
+
+## Instructions
+
+* Buffer the `shelters` object by 500m with `st_buffer()` -- `sf` will automatically use meters, the units of the CRS. Check the CRS of shelters and aarhus municipality to ensure they are identical and reproject if not. Use pipes for neater code.
+* Create a new object called `sh_buffers` which is just the geometry of the buffered shelters with `st_geometry()`.
+* Compute the number of features in the `sh_buffers` object with `length()` and `plot()` to see what they look like.
+* Dissolve the buffers in `sh_buffers`, call this `sh_buf_union`.
+* Compute the number of features in the `sh_buf_union` object with `length()` and `plot()` to see what the dissolved object looks like.
+
+```{r shelter-buffers, eval=FALSE}
+# Buffer the shelters by 500m after projecting the object to crs
+all.equal(___________,________)
+
+sh_buffer <- shelters %>% 
+  # project to Aarhus municipality CRS if different
+  ___________(crs = ________) %>% 
+  st_buffer(______)
+
+# Limit the object to just geometry
+sh_buffers <- _________(sh_buffer)
+
+# Compute the number of features in sh_buffer
+________(sh_buffers)
+
+# Plot the shelter buffers
+_____(sh_buffers)
+
+# Dissolve the buffers
+sh_buf_union <- __________(sh_buffers)
+
+# Compute the number of features in sh_buf_union
+________(sh_buf_union)
+
+# Plot the dissolved buffers
+______(sh_buf_union)
+
+```
+
+
+Great! You'll see later that the `st_union()` function is important in other spatial analysis contexts, so it's a good one to commit to memory.
+
+# Task 5: Compute a convex hull around vectors
+A more precise bounding polygon is sometimes needed, one that fits your data more neatly. For this, you can use the `st_convex_hull()` function. Note that `st_convex_hull()` will compute a tight box around each one of your features *individually* so if you want to create a convex hull around a group of features you'll need to use `st_union()` to combine individual features into a single multi-feature.
+
+## Instructions
+
+* Use `head()` on `shelters` to look at the data frame and see the type of geometry.
+* Use `st_union()` to combine the individual points in the `shelters` object into a single MULTIPOINT geometry and call this sh1.
+* Use `head()` on `sh1` to see the type of geometry of the dissolved object.
+* Use the `length()` function from `base` R on `shelters` and `sh1` to confirm that the number of features went from 17 to 1.
+* Use the `st_convex_hull()` function on `sh1` to compute the tight bounding box around the shelters and call this `shelters_hull`.
+* Plot `shelters_hull` and then plot the points on top. Use `plot()` twice and run the lines together.
+
+```{r convexhull, eval=FALSE}
+# Look at the data frame to see the type of geometry
+___(shelters)
+
+# Convert the points to a single multi-point
+sh1 <- ___(shelters)
+
+# Look at the data frame to see the type of geometry
+___(sh1)
+
+# Confirm that we went from 17 features to 1 feature
+___(shelters)
+___(sh1)
+
+# Compute the tight bounding box
+shelters_hull <- ___(sh1)
+
+# Plot the points together with the hull
+plot(shelters_hull, col = "red")
+plot(sh1, ___ = ___)
+```
+
+
+It takes a little getting used to, but when computing a convex hull, you'll need to remember to first *dissolve/union/combine* your individual features into a multi-feature. When you used `head()` you should have noticed that you started with “POINT” objects and after `st_union()` you had “MULTIPOINT”. Convex hulls will be super useful in later point analysis as statistical results often depend on the area that encloses the features of interest, and sometimes you need as tight as envelope as possible.
+
+
