@@ -108,7 +108,14 @@ Which of the functions provide the shortest and longest measurement? By what per
 ```{r diff}
 # Calculate the difference in km
 
+gc_dist <- distHaversine(my_points) 
+rl_dist <- distRhumb(my_points)
+
+(rl_dist-gc_dist)/gc_dist*100
+
 # Calculate percent difference
+gc_dist/1000
+(rl_dist-gc_dist)/gc_dist*100
 ```
 
 ##  Sidenote: When is it NOT okay to assume the Earth is a sphere?
