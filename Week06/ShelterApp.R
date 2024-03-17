@@ -3,7 +3,7 @@ library(leaflet)
 library(mapboxapi)
 library(sf)
 
-token <- my_token
+token <- mytoken
   # Read in the shelter data
 shelter <- readr::read_rds("../data/shelters.rds") 
 
@@ -16,7 +16,7 @@ ui <- fluidPage(
     textInput("address_text", label = "Address",
               placeholder = "Type an address or place name"),
     actionButton("action", "Find the nearest shelter"),
-    textInput("instructions_text", label = "Instructions to the shelter /n (beware:location error ~100m)"),
+    textInput("instructions_text", label = "Instructions to the shelter \n(beware:location error ~100m)"),
     htmlOutput("instructions"),
     width = 3
   ),
