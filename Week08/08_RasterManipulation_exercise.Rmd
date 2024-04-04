@@ -1,5 +1,5 @@
 ---
-title: "06 - Raster manipulation and analysis"
+title: "08 - Raster manipulation and analysis"
 author: "Adela Sobotkova"
 date: "06/02/2022 updated `r Sys.Date()`"
 output:

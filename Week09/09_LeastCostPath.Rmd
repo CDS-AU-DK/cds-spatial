@@ -1,0 +1,226 @@
+---
+title: "Ease of Travel"
+author: "Adela Sobotkova"
+date: "11/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Why calculating travel cost matters
+Humans need protection, provision, and meaning to their lives, and most of these activities happen in proximity to their abodes but not always at home. Movement matters, and ease of movement often determines where people go. 
+
+Many studies recognise the higher cost of tending fields and crops and the associated reduction in yields which occur with increasing distance from settlements (Lee 1969; Chisholm 1962; Vita-Finzi & Higgs 1970; Dennell & Webley 1975; Roper 1979). 
+
+Time and friction of the surrounding environment pose obstacles to human activities and aggregation and need to be overcome as people wish to socialize and gather.
+
+There are a number of ways to calculate the cost of movement (see 
+https://www.spatialanalysisonline.com/HTML/index.html?cost_distance.htm)
+
+Counting with time is another representation of travel. 
+
+# Tobler's Hiker algorithm
+Waldo Tobler's paper: https://escholarship.org/content/qt05r820mz/qt05r820mz.pdf
+
+`walkrate = a*exp(-b*abs(S+c))`
+
+* walking velocity is in km/h
+* S = height difference/distance (in same units)
+* c is 0.05 constant that gets us to 5 km/h on the flat terrain
+* for off-path travel, multiply by 0.6, for horseback, multiply by 1.25.
+* travel time is computed as distance/velocity
+
+Calculations are best done in a geographic matrix, with elevations at equally spaced increments in two directions (or need correction).
+Then one can compute, from any inital point, the minimum time path to all other places (Figure IVa).
+Connecting places at equal time-distances yields isochronic lines, or "geographic circles" (Figure IVb). Putting in the gradients to this contour map then yields two sets of orthogonal lines (Figure IVc), isomorphic with Gauss’ geodesic polar coordinates for which the metric takes on a particularly simple form.
+
+# Implemented in gdistance package
+http://www2.uaem.mx/r-mirror/web/packages/gdistance/vignettes/gdistance-vignette.pdf
+```{r getting-started}
+# Example
+library(gdistance)
+library(raster)
+# example equivalent to that in the documentation on r.cost in GRASS
+r <- raster(nrows=6, ncols=7, 
+            xmn=0, xmx=7, 
+            ymn=0, ymx=6, 
+            crs="+proj=utm +units=m")
+
+r[] <- c(2, 2, 1, 1, 5, 5, 5,
+         2, 2, 8, 8, 5, 2, 1,
+         7, 1, 1, 8, 2, 2, 2,
+         8, 7, 8, 8, 8, 8, 5,
+         8, 8, 1, 1, 5, 3, 9,
+         8, 1, 1, 2, 5, 3, 9)
+
+# 1/mean: reciprocal to get permeability
+tr <- transition(r, function(x) 1/mean(x), 8) 
+tr <- geoCorrection(tr)
+
+c1 <- c(5.5,1.5) 
+c2 <- c(1.5,5.5)
+
+A <- accCost(tr, c1)
+plot(A)
+text(A)
+hist(A)
+```
+
+
+
+## Tobler's hiker formula
+```{r tobler}
+# Flat terrain comes to 5 km per hour
+slope <- 0.0
+travelcost <-6*exp(-3.5*abs(slope+0.05)) # on foot on path
+travelcost_op <-6*exp(-3.5*abs(slope+0.05))*0.6 # off path
+
+```
+
+## Maunga Whay Volcano example (part of r base data)
+http://www2.uaem.mx/r-mirror/web/packages/gdistance/vignettes/gdistance-vignette.pdf
+```{r}
+?volcano
+r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
+plot(r) # plot volcano
+hist(r)
+```
+
+The Hiking Function requires the slope as input.
+slope = difference in height / distance travelled
+
+```{r}
+heightDiff <- function(x){x[2] - x[1]}
+hd <- transition(r,heightDiff,8,symm=FALSE)
+hd
+slope <- geoCorrection(hd, scl=FALSE)
+slope
+plot(raster(slope))
+```
+
+Subsequently, we calculate the speed. We need to exercise special care, because the matrix value between non-adjacent cells is 0, but the slope between these cells is not 0! Therefore, we need to restrict the calculation to adjacent cells. We do this by creating an index for adjacent cells (adj) with the function `adjacent()`. Using this index, we extract and replace adjacent cells, without touching the other values
+
+```{r adjacent-speed}
+# tobler
+# 6 * 1000 * exp(-3.5 * abs(0 + 0.05))
+adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8)
+speed <- slope
+# for kms per hour, eliminate 1000 before exp 
+speed[adj] <- 6 * 1000 * exp(-3.5 * abs(slope[adj] + 0.05))
+plot(raster(speed), main = "Friction of surface in meters/hour") 
+```
+
+Now we have calculated the speed of movement between adjacent cells. We are close to having the final conductance values. Attainable speed is a measure of the ease of crossing from one cell to another on the grid. However, we also need to take into account the distance between cell centres. Travelling with the same speed, a diagonal connection between cells takes longer to cross than a straight connection. Therefore, we use the function `geoCorrection()` again!
+
+```{r geocorrection}
+x <- geoCorrection(speed, scl = FALSE)
+plot(raster(x), main = "Conductance to travel - meters/hour")
+```
+
+This gives our final ”conductance” values.
+What do these ”conductance” values mean? The function `geoCorrection` divides the values in the matrix with the distance between cell centres. So, with our last command we calculated this:
+
+conductance = speed / distance
+
+This looks a lot like a measure that we are more familiar with:
+
+travel time = distance / speed
+
+In fact, the conductance values we have calculated are the reciprocal of travel time.
+
+1 / travel time = speed / distance = conductance
+
+Maximizing the reciprocal of travel time is exactly equivalent to minimizing travel time.
+
+# Distance in cost grid
+Now, let's define two coordinates, A and B, and calculate least cost paths between them. We test if the quickest path from A to B is the same as the quickest part from B to A.
+```{r}
+A <- c(2667670,6479000)
+B <- c(2667800,6479400)
+AtoB <- shortestPath(x, A, B, output="SpatialLines")
+BtoA <- shortestPath(x, B, A, output="SpatialLines")
+
+plot(r)
+lines(AtoB, col="red", lwd=2)
+lines(BtoA, col="blue")
+text(A[1]-10,A[2]-10,"A")
+text(B[1]+10,B[2]+10,"B")
+```
+A small part of the A-B (red) and B-A (blue) lines in the figure do not
+overlap. This is a consequence of the asymmetry of the Hiking Function
+
+## What's the length and cost of these paths?
+```{r length-cost}
+# Length
+library(sf)
+st_length(st_as_sf(AtoB)) #  486m
+st_length(st_as_sf(BtoA))
+```
+# What's the cost of the path?
+```{r cost-path}
+# to understand units, check out https://stackoverflow.com/questions/36523709/r-gdistance-different-results-for-acccost-and-costdistance
+
+# Cost
+plot(raster(speed))
+contour(raster(speed), add = TRUE)
+
+# Extract cost cells for the AtoB path
+AtoBcost <- raster::overlay(raster(x), rasterize(AtoB, raster(x)), fun = "sum")
+plot(AtoBcost) # see path colorcoded by travel difficulty
+
+sum(na.omit(values(AtoBcost))) # what does the 17866.48 number mean, actually?
+
+# Cost distance function
+library(gdistance)
+costDistance(x,fromCoords=A,toCoords=B) # 0.12h
+
+ca <- accCost(x,fromCoords=A)
+extract(ca,B)
+
+plot(ca, main = "Cost of traversing a cell in hours")
+```
+
+# Plot the points (needs conversion)
+```{r}
+library(sf)
+pointsdf <- data.frame(rbind(A, B))
+points <- st_as_sf(pointsdf,
+               coords=c("X1","X2"), 
+               crs = st_crs(x))
+
+plot(raster(speed), main = "Raw speed in m/s"); plot(points, add = TRUE)
+plot(raster(x), main = "Corrected conductance grid"); plot(points, add = TRUE)
+```
+
+
+
+# Accummulated Cost Surface - isochrones
+```{r}
+plot(raster(x))
+
+library(gdistance)
+library(sp)
+y <- accCost(x, fromCoords = as_Spatial(points))
+plot(y, main = "cost of travel in seconds"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
+
+# Compare with raw cost distance *nearly no difference
+yraw <- accCost(speed,fromCoords = as(points, "Spatial"))
+
+dir.create("outputs")
+pdf("outputs/CostSurface.pdf")
+plot(y, main = "cost of travel in meters/hour"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
+dev.off()
+```
+
+## Need more reasonable units? Reclassify
+```{r rcl}
+rcl <- c(0,300,5,
+            301,600,10,
+            601,1200,20)
+rclmat <- as.matrix(rcl,
+                    ncol=3, 
+                    byrow = TRUE)
+x_rcl <- reclassify(raster(x), rcl =rclmat)
+```
+
