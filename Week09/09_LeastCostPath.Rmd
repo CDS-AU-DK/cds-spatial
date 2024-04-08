@@ -73,8 +73,8 @@ hist(A)
 ```{r tobler}
 # Flat terrain comes to 5 km per hour
 slope <- 0.0
-travelcost <-6*exp(-3.5*abs(slope+0.05)) # on foot on path
-travelcost_op <-6*exp(-3.5*abs(slope+0.05))*0.6 # off path
+travelcost <-6*exp(-3.5*abs(slope+0.05)) # on foot on path ~ 5km/h
+travelcost_op <-6*exp(-3.5*abs(slope+0.05))*0.6 # off path ~ 3km/h
 
 ```
 
@@ -97,6 +97,7 @@ hd
 slope <- geoCorrection(hd, scl=FALSE)
 slope
 plot(raster(slope))
+hist(values(raster(slope)), xlab = "degrees")
 ```
 
 Subsequently, we calculate the speed. We need to exercise special care, because the matrix value between non-adjacent cells is 0, but the slope between these cells is not 0! Therefore, we need to restrict the calculation to adjacent cells. We do this by creating an index for adjacent cells (adj) with the function `adjacent()`. Using this index, we extract and replace adjacent cells, without touching the other values
@@ -106,8 +107,8 @@ Subsequently, we calculate the speed. We need to exercise special care, because 
 # 6 * 1000 * exp(-3.5 * abs(0 + 0.05))
 adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8)
 speed <- slope
-# for kms per hour, eliminate 1000 before exp 
-speed[adj] <- 6 * 1000 * exp(-3.5 * abs(slope[adj] + 0.05))
+# for kms per hour, eliminate 1000 before exp. We keep meters, because CRS is meters
+speed[adj] <- 6 * 1000* exp(-3.5 * abs(slope[adj] + 0.05))
 plot(raster(speed), main = "Friction of surface in meters/hour") 
 ```
 
@@ -189,38 +190,140 @@ points <- st_as_sf(pointsdf,
                coords=c("X1","X2"), 
                crs = st_crs(x))
 
-plot(raster(speed), main = "Raw speed in m/s"); plot(points, add = TRUE)
+plot(raster(speed), main = "Raw speed in m/h"); plot(points, add = TRUE)
 plot(raster(x), main = "Corrected conductance grid"); plot(points, add = TRUE)
 ```
 
 
 
 # Accummulated Cost Surface - isochrones
+Isochrones connect cells that take the same amount of time to cross.
 ```{r}
 plot(raster(x))
 
 library(gdistance)
 library(sp)
-y <- accCost(x, fromCoords = as_Spatial(points))
-plot(y, main = "cost of travel in seconds"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
+library(sf)
+y <- accCost(x, fromCoords = as(points, "Spatial"))
+plot(y, main = "cost of travel in hours"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
 
 # Compare with raw cost distance *nearly no difference
 yraw <- accCost(speed,fromCoords = as(points, "Spatial"))
 
 dir.create("outputs")
 pdf("outputs/CostSurface.pdf")
-plot(y, main = "cost of travel in meters/hour"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
+plot(y, main = "cost of travel in hours"); plot(as(points, "Spatial"), add =TRUE); contour(y, add =TRUE )
 dev.off()
 ```
+## Least cost paths in Yambol region: multiple points
 
-## Need more reasonable units? Reclassify
-```{r rcl}
-rcl <- c(0,300,5,
-            301,600,10,
-            601,1200,20)
-rclmat <- as.matrix(rcl,
-                    ncol=3, 
-                    byrow = TRUE)
-x_rcl <- reclassify(raster(x), rcl =rclmat)
+```{r}
+library(tidyverse)
+
+# load obstacle: the river
+Tonzos <- read_sf("~/../Desktop/TRAP_Oxbow/TopoData/Tonzos.shp")
+Tonzos <- Tonzos %>% st_transform(32635)
+
+# Add major/random settlements within region
+settle <- read_sf("~/../Desktop/TRAP_Oxbow/TopoData/Modern_settlements_Yambol_TRAP.shp")
+settle <- settle %>% 
+ # st_drop_geometry() %>% 
+  dplyr::filter(!is.na(NAME_map)) %>% 
+  dplyr::select(NAME_map | ends_with("_en")) %>% 
+  st_centroid()
+
+# Add via diagonalis
+diagonalis <- read_sf("~/../Desktop/TRAP_Oxbow/TopoData/Roman_roads_BarringtonAtlas.shp")
+viae <- diagonalis %>% 
+  st_transform(32635) %>% 
+  st_intersection(Y_region)
+
+plot(viae)
+
+# load entryways into the region
+border <- st_make_grid(settle, n= 1)
+plot(settle$geometry); plot(border, add =T)
+Y_region <- read_sf("~/../Desktop/TRAP_Oxbow/TopoData/Yambol_municipalities.shp")
+Y_region <- st_union(Y_region$geometry)
+plot(Y_region)
+
+# cast border into points
+test <- Y_region %>% 
+  st_buffer(200) %>% 
+  st_simplify(dTolerance = 500) %>%  # to be simpler
+  st_convex_hull() %>% 
+  st_cast(to = "POINT")
+plot(test[-c(7,9,13,14)])
+
+
+places <- data.frame(name = c("Topolovgrad", "Krushare", "Prohod", "Valchanovo", "Zheleznik"),
+                     lat = c(42.09177426394385,42.5581286490158,42.327922453869185,
+                             42.26295408961938, 42.56753262714555),
+                     long = c(26.34963390596414,26.389174645837592, 27.0540046157391, 27.084479032105204, 26.90031980591084))
+
+places <- places %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
+  st_transform(32635)
+
+library(mapview)
+mapview(test[-c(7,9,13,14)]) + mapview(places) #+ mapview(settle)
+test <- test[-c(7,9,13,14)]
+
+border <- c(places, st_sf(test))
+border <- c(places$geometry, test)
+
+mapview(st_sf(border))
+# Plot everything
+mapview(Tonzos) + mapview(settle)+mapview(border)
+
+# Give border points names
+border <- border %>% 
+  st_as_sf() %>% 
+  mutate(name = letters[1:18])
 ```
+
+## Convert everything into raster or spatial format
+```{r}
+Y_elev <- raster("../../../YambolMoundAnalysis2023/output_data/large/YT_elev32635.tif")
+Y_elev <- crop(Y_elev, st_sf(border))
+Y_elev_sm <- aggregate(Y_elev, fact=5)
+plot(Y_elev)
+tonzos <- st_intersection(Tonzos, st_convex_hull(st_union(border)))
+library(raster)
+r <- raster(Y_elev_sm)
+t <- rasterize(as(tonzos,"Spatial"), r)
+mapview(t)
+t <- reclassify(t, rcl = cbind(1,-100))
+
+t <- reclassify(t, rcl = cbind(NA,1))
+unique(values(t))
+f <- function(r1,r2){
+  r1 + r2
+}
+elev_t <-overlay(Y_elev_sm, t, fun = f) 
+mapview(elev_t)
+```
+
+
+## Calculate a LCP network following Tobler
+
+origin must be a spatial object with a name. plain geometry errors out.
+```{r}
+# uses the on-path Tobler's hiking function
+
+library(movecost)
+lcp <- movenetw(dtm = elev_t, origin = as(settle, "Spatial"), barrier = as(viae, "Spatial"), field = 10, move = 8, funct = "t", lcp.dens = TRUE, export = TRUE)
+saveRDS(lcp, "../data/lcp.rds")
+plot(lcp$LCPs.density.perc)
+plot(lcp$LCPs.density.count)
+
+plot(elev_t);plot(lcp$LCPs.netw.merged, add =T, col = "darkgrey");
+plot(viae$geometry, col = "darkgreen", add = T);
+plot(settle$geometry, add = T, col = "red");
+plot(Y_region, add = T, borders = "grey")
+# add most prominent mounds to the view
+plot(mounds)
+```
+
+
 
