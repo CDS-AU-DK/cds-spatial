@@ -325,23 +325,30 @@ Note that you have aggregated the final cluster raster by using the `focal()` fu
 The ITC (Individual Tree Crowns) delineation approach finds *local* maxima within imagery that contains subtle color differences, such as the canopy image provided. The `itcIMG()` function designates these maxima as tree tops, then uses a decision tree method to grow individual crowns around the local maxima.
 
 The image we use is based on LiDAR (Light Detection and Ranging) in xyz format.
+To get the segmentation going you will need either `rgeos` with `itcSegment` version 07 or the `terra` and current `itcSegment` packages
 ```{r itcs}
-install.packages("itcSegment") # get the imgData in an old instance of itcSegment!
+# install.packages("terra")
+# install.packages("itcSegment")
+
+library(terra)
 library(itcSegment)
 
-data(itcIMG) 
-plot(itcIMG)
+imgData <- rast("../data/imgData.tif")
+
+plot(imgData)
 
 # Use the itcIMG() function to detect and grow the individual crowns
-se<-itcIMG(imgData, epsg=32632)
+
+se<-itcIMG(imgData,epsg=32632)
+summary(se)
 
 # What is the product of the function? Is it a raster or vector?
-summary(se)
+se
 plot(se,axes=T)
 
 ### Let´s overlay the image and the product of segmentation (run both lines)
 plot(imgData)
-plot(se,axes=T,add=T)
+plot(se,axes=F,add=T)
 ```
 
 
@@ -368,33 +375,31 @@ leaflet() %>%
   addRasterImage(imgData) %>% 
   addPolygons(data=se4326, weight = 1, color = "black" )   # Tadaa
 ```
+Can you figure out where this forested landscape is from?
 
 
-
-# Task 12: OPTIONAL: a more demanding segmentation example with a bigger raster! 
+# Task 12: OPTIONAL: a more demanding segmentation example with a bigger raster!
+And because we have it in the data/ folder, try with this larger example.
 ```{r itcs-big, eval=FALSE}
-r <- raster("../data/myDem_subset.tif")
+r <- rast("../data/myDem_subset.tif")
 r
 plot(r)
 
-r.se<-itcIMG(r,epsg=25829, ischm=T) ### slow on my laptop (solid 2-3mins)!!!
+r.se<-itcIMG(r,epsg=25829, ischm=T) # can be a bit slow (2-3mins)
 summary(r.se)
-plot(r);plot(r.se,axes=T, add=TRUE)
+plot(r);plot(r.se,axes=F, add=TRUE)
 
 # Adjust 'th' argument for excessive capture of small growth
 r.se5<-itcIMG(r,epsg=25829,th = 5, ischm=T) # th - how low should algorithm be looking for canopy
 plot(r);plot(r.se5,axes=T, add=TRUE)
 
-# Write the result to shapefile
-library(rgdal)
-?writeOGR
-td <- getwd()
-writeOGR(r.se,td,"../data/itcTrees_subset",driver="ESRI Shapefile" )
-
+# Write the result to shapefile 
+td
+st_write(st_as_sf(r.se),"../data/itcTrees_subset",driver="ESRI Shapefile" )
 
 # want to see it in Leaflet?
 library(sf)
-rse <- st_read("../data/itcTrees_subset.shp")
+rse <- st_read("../data/itcTrees_subset/itcTrees_subset.shp")
 rse4326 <- st_transform(rse, crs = 4326)
 
 # Control question: where is this landscape from?
@@ -402,7 +407,7 @@ leaflet() %>%
   addTiles() %>% 
   addProviderTiles("Esri.WorldPhysical") %>% 
  # addProviderTiles("Esri.WorldImagery") %>% 
-  addRasterImage(projectRaster(r, crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ")) %>% 
+  addRasterImage(r) %>% 
   addPolygons(data=rse4326, weight = 1, color = "black" )   # Neat :)
 ```
 
