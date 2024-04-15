@@ -51,7 +51,8 @@ library(latticeExtra)
 library(RColorBrewer)
 library(rasterVis)
 #library(rgdal)
-library(rgl)
+library(rgl)  # macs might need another prerequisite
+library(landsat)
 ```
 
 # Task 2: Pre-processing of Landsat datasets 
@@ -179,7 +180,7 @@ filename <- tempfile(fileext = ".html")
 htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)
 
-plot3D(dem, drape=j4) ## should drape image j4 over DEM, if problematic try in .R script and watch for a pop-up widget. Ask Adela to demo!
+plot3D(dem, drape= j1) ## should drape image j4 over DEM, if problematic try in .R script and watch for a pop-up widget. Ask Adela to demo!
 
 ```
 
@@ -194,6 +195,9 @@ image(nov3, main="nov")
 image(july3,main="july")
 plot(nov3, main="nov")
 plot(july3, main="july")
+
+hist(j3)
+hist(raster(nov3))
 
 # let's create a matching histogram by stretching nov3 to july3
 nov3.newH <- histmatch(master=july3, tofix=nov3)
@@ -246,7 +250,7 @@ ndvi[ndvi <= 0] <- NA
 plot(ndvi)
 
 ## plot again
-# plot3D(dem, drape=ndvi)
+plot3D(dem, drape=ndvi)
 
 ## different way to plot in 2D
 library(rasterVis)
@@ -301,7 +305,7 @@ ICE_df <- as.data.frame(myNewBrick)
 set.seed(99)
 
 
-cluster_ICE <- kmeans(ICE_df, 10) ### kmeans, with 4 clusters
+cluster_ICE <- kmeans(ICE_df, 4) ### kmeans, with 4 clusters
 str(cluster_ICE)
 # cluster_ICE <- cluster::clara(ICE_df, 4) ### another option, clara, with 4 clusters
 
@@ -338,7 +342,7 @@ imgData <- rast("../data/imgData.tif")
 plot(imgData)
 
 # Use the itcIMG() function to detect and grow the individual crowns
-
+?itcIMG()
 se<-itcIMG(imgData,epsg=32632)
 summary(se)
 
@@ -394,7 +398,6 @@ r.se5<-itcIMG(r,epsg=25829,th = 5, ischm=T) # th - how low should algorithm be l
 plot(r);plot(r.se5,axes=T, add=TRUE)
 
 # Write the result to shapefile 
-td
 st_write(st_as_sf(r.se),"../data/itcTrees_subset",driver="ESRI Shapefile" )
 
 # want to see it in Leaflet?
