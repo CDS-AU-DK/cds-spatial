@@ -92,6 +92,9 @@ library(spatstat)
 st_coordinates(baths_hist)  # 21 coordinates
 st_coordinates(baths_osm)   # 177 coordinates
 
+st_crs(baths_hist)
+st_crs(baths_osm)
+
 combined <- data.frame(rbind(st_coordinates(baths_hist),
                   st_coordinates(baths_osm)))
 
