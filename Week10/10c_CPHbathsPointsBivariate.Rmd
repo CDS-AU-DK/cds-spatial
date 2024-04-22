@@ -173,7 +173,7 @@ How do we test for statistical significance? The question here is whether the H 
 ```{r simulate-kross-env}
 
 kmult <- envelope(b_ppp, fun=Kcross,
-                  nsim=100, i="HIST", j="OSM",
+                  nsim=1000, i="HIST", j="OSM",
                   r=rc, 
                   correction='border',
                   simulate=expression(rlabel(b_ppp))
