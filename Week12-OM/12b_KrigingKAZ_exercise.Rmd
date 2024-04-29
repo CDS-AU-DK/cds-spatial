@@ -1,0 +1,274 @@
+---
+title: "Kazanlak Kriging"
+author: "Adela Sobotkova"
+date: "29 March 2021 updated `r format(Sys.time(), '%d %B %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+## Global options
+options(max.print="75")
+knitr::opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+
+
+library(tidyverse)
+```
+
+## Task 1: Kriging: Filling in the gaps
+Now that you have generated a variogram from the locations with existing geochemical data, you can produce estimates at new locations. You can estimate new values at individual points or across the entire area of the valley, using kriging. 
+
+Kriging is the final part of geostatical estimation. This is the application of the variogram along with the sampled data points to produce estimates and uncertainties at new locations.
+
+The computation of estimates and uncertainties, together with the assumption of a normal (Gaussian) response means you can compute any function of the estimates - for example the probability of a new location having highly fertile soil.
+
+### Instructions
+
+* The geochemical survey data `kaz_geo`, the dataframe with the missing values `kaz_geo_miss` and the variogram model `v_model`, were created in the previous exercise and should be in your environment.
+* You will need to load the `gstat`, `sf`, and `raster` libraries.
+* Complete the `krige()` formula to indicate kriging with a spatial trend surface.
+* Use the `kaz_geo_miss` as `newdata` locations.
+* Plot the predicted organic matter from the returned object using `ggplot()` or `spplot()`.
+
+```{r start-kriging, eval=FALSE} 
+# Load gstat, sf and raster library
+library(_____)
+library(_____)
+
+# Reload kaz_geo, missing value dataframe and the v_model
+kaz_geo
+
+# Set the trend formula and the new data
+km <- krige(OM ~ X + Y, 
+            input = ________, 
+            newdata = _______, 
+            model = v_model)
+names(km)
+
+# Plot the predicted values
+ggplot(km) +
+  geom_sf(aes(col = var1.pred))
+
+# Compute the probability of highly fertile soil samples, and map
+km$pFertile <- 1 - pnorm(5, mean = km$var1.pred, sd = sqrt(km$var1.var))
+
+library(raster)
+spplot(as(km, "Spatial"), "pFertile")
+
+```
+
+## Task 2: Making a prediction grid
+Past farmers used the fields around their villages. In order to evaluate their settlement choices, you need a map of soil probability that spans the valley rather than just village centroids.
+To do this, you are going to do some kriging using the `krige()` function over the study area. This requires a grid, or rather, a `SpatialPixels` object which will take a bit of data manipulation to create. You start by defining a grid, creating points on that grid, cropping to the study region, and then finally converting to `SpatialPixels`. On the way, you'll meet some new functions.
+
+`GridTopology()` defines a rectangular grid. It takes three vectors of length two as inputs. The first specifies the position of the bottom left corner of the grid. The second specifies the width and height of each rectangle in the grid, and the third specifies the number of rectangles in each direction.
+
+To ensure that the grid and the study area have the same coordinates, some housekeeping is involved. `SpatialPoints()` converts the points to a coordinate reference system (CRS), or projection (different packages use different terminology for the same concept). The CRS is created by wrapping the study area in `projection()`, then in `CRS()`. This data manipulation is necessary to align the grid and the study area.
+
+Now that you have that alignment, `crop()`, as the name suggests, crops the grid to the study area.
+
+Finally, `SpatialPixels()` converts the raster cropped `gridpoints` to the equivalent `sp` object.
+
+### Instructions
+
+* Keep using the geochemical survey data `kaz_geo`, the missing value dataframe, `kaz_geo_miss`, the variogram,` vgm`, and the variogram model, `v_model` from previous exercises.
+* Create the bounding box for the study area and assign to an object called `geo_bounds`.
+* Use `st_bbox(geo_bounds)` to get the corners of the grid.
+* Construct a rectangular grid over the region.
+  - Call `GridTopology()`.
+  - Round the position of the bottom left corner to the nearest integer and pass it as the first argument.
+  - Assign the result to grid.        
+* Align the grid coordinate with the study area boundary coordinates.
+  - Call `SpatialPoints()`.
+  - Pass `grid` as the first argument.
+  - Pass the coordinate reference system of the study area boundary to the `proj4string` argument.
+  - Assign the result to `gridpoints`.
+  - Plot this object to see your progress.
+* Crop the grid points to the shape of the boundary object.
+  - Call `crop()`.
+  - Pass the grid points as the first argument.
+  - Pass the study area boundary as the second argument.
+  - Assign the result to `cropped_gridpoints`.
+  - Plot this object to see your progress.
+* Convert the cropped grid points to a `SpatialPixels` object.
+  - Call `SpatialPixels()`.
+  - Pass `cropped_gridpoints` as the only argument.
+  - Assign the result to `spgrid`.
+  - Plot this object to see your progress.
+  
+```{r create-grid}
+# Create geo_bounds bounding box for kaz_geo 
+library(sf)
+geo_bounds <- st_make_grid(kaz_geo$geometry, n=1)
+
+# Plot the bounding box polygon and points
+plot(kaz_geo$geometry); plot(geo_bounds, add= TRUE) 
+
+# Find the left bottom corner of the bounding box
+st_bbox(kaz_geo)
+
+# Define a 0.5km square grid over the polygon extent. The first parameter is the bottom left corner.
+grid <- GridTopology(c(352042.5,4712740.7), c(500, 500), c(35, 40))
+
+# Create points with the same coordinate system as the boundary box
+crs(kaz_geo)
+gridpoints <- SpatialPoints(grid, proj4string = CRS(projection("+proj=utm +zone=35 +datum=WGS84 +units=m +no_defs")))
+plot(gridpoints); plot(geo_bounds, col = "red", add = TRUE)
+
+# Crop out the points outside the boundary
+cropped_gridpoints <- crop(gridpoints, as(geo_bounds, "Spatial"))
+plot(cropped_gridpoints);  plot(geo_bounds, col = "red", add = TRUE)
+
+# Convert to SpatialPixels
+spgrid <- SpatialPixels(cropped_gridpoints)
+coordnames(spgrid) <- c("X", "Y")
+plot(spgrid)
+
+```
+
+
+Good effort! Manipulating the data into the right form can be hard work. Now you have what you want, you can do some gridded kriging!
+
+## Task 3: Gridded predictions
+Constructing the grid is the hard part done. You can now compute `kriged` estimates over the grid using the variogram model from before (`v_model`) and the grid of `SpatialPixels`.
+
+### Instructions
+
+Use the spatial pixel grid of the region, `spgrid`, and the variogram model of OM, `v_model` from previous exercises.
+
+* Ensure that the `spgrid` and `kaz_geo` objects have the same coordinate system definition with CRS() function.
+* Use kriging to predict OM in each grid rectangle throughout the study area.
+  - Call `krige()`.
+  - The formula and input data are already specified.
+  - Pass `spgrid` as the new data to predict.
+  - Pass the variogram model to the model argument.
+* Calculate the probability of fertile (>5) soil samples in each grid rectangle.
+  - The mean of the predictions is the `var1.pred` element of `OM_grid`.
+  - The variance of the predictions is the `var1.var` element of `OM_grid`. Take the square root to get the standard deviation.
+* Plot the organic matter in each grid rectangle.
+  - Call `spplot()`.
+  - Pass the organic matter column to the `zcol` argument as a string
+```{r kriging-over-grid, eval=FALSE}
+# Adjust the kaz_geo CRS to be consistent with spgrid
+crs(as(kaz_geo, "Spatial"), asText = TRUE) == crs(spgrid, asText = TRUE)
+
+# If krige() below starts erroring out due to CRS syntax, you may need to force unity :
+# kaz_geo_sp <- as(kaz_geo, "Spatial")
+# crs(kaz_geo_sp) <- crs(spgrid)
+
+# Do kriging predictions over the grid
+library(gstat)
+OM_grid <- krige(OM_muns ~ X + Y, 
+                 input = _______, 
+                 newdata = _______, 
+                 model = __________)
+
+# Plot the soil-nutrient predictions in a grid
+image(OM_grid, col = rainbow(100))
+contour(OM_grid, levels= seq(1, 10, 1), add = TRUE, col = "black")
+
+print(OM_grid)
+
+# Calculate the probability of organic matter exceeding 7
+OM_grid$pFertile <- 1 - pnorm(7, mean = OM_grid$var1.pred, sd = sqrt(OM_grid$var1.var))
+
+# Map the probability of soils OM exceeding 7
+spplot(OM_grid, zcol = _________)
+```
+  
+
+## Task 4: Auto-kriging at point locations
+The `autoKrige()` function in the `automap` package computes binned variograms, fits models, does model selection, and performs kriging by making multiple calls to the `gstat` functions you used previously. It can be a great time-saver but you should always check the results carefully.
+
+We will apply it here to get predictions at the ancient village locations so we can compare with manual results.
+
+`autoKrige()` can try several variogram model types. In the example, you'll use a Matern variogram model, which is commonly used in soil and forestry analyses. You can see a complete list of available models by calling `vgm()` with no arguments.
+
+### Instructions
+
+* Activate the `automap` package
+* Call `autoKrige()` to automatically run a kriging model.
+  - Set the formula for modeling organic matter versus the position, as before.
+  - The `input_data` is the non-missing data from the survey.
+  - The `new_data` is the missing data from the survey.
+  - Set the `model` to `"Mat"`. (Note the capital M)
+  - Assign the result to `OM_auto`.
+  - If you get mysterious errors, doublecheck that data CRS is identical. Ideally convert `kaz_geomiss`  to Spatial format.
+* Call `plot()` on `OM_auto` to see the results.
+
+```{r autokriging, eval=FALSE}
+# Ensure all the necessary objects exist
+library(automap)
+
+# If you are getting an error about spatial reference not being the same in autokriging, coerce-assign the CRS string for the new_data and input_data objects
+kaz_geomiss <- as(kaz_geo_miss, ________)
+crs(kaz_geomiss) <- crs(kaz_geo)
+
+# Kriging with linear trend, predicting over the missing points
+OM_auto <- ___________(
+  OM_muns ~ X + Y, 
+  input_data = ___________, 
+  new_data = ___________, 
+  model = ___________
+)
+
+# Plot the variogram, predictions, and standard error
+plot(OM_auto)
+```
+
+
+
+
+
+
+## Task 5: Auto-kriging over a grid
+
+You can also use `autoKrige()` over the `spgrid` grid from the earlier exercise. This brings together all the concepts that you've learned today. That is, kriging is great for predicting missing data, plotting things on a grid is much clearer than plotting individual points, and automatic kriging is less hassle than manual kriging.
+
+### Instructions
+
+The geochem survey data, `kaz_geo`, the missing value dataframe, `kaz_geo_miss`, the spatial pixel grid of the region, `spgrid`, the manual kriging grid model, `OM_grid`, and the variogram model of OM, `v_model` are in your environment or defined above.
+
+* Automatically fit a kriging model.
+  - Call `autoKrige()`.
+  - The first argument is the same formula you have used throughout the exercise.
+  - The `input_data` argument contains the geochemical survey data.
+  - The `new_data` argument is the grid of prediction locations.
+  - Assign the result to `OM_auto_grid`.
+* To remind yourself of the manual kriging predictions, plot `OM_grid`.
+* Plot `OM_auto_grid`. *Do the predictions look similar or different?*
+* To compare the manual and automated variogram models, print `v_model` the `var_model` element of `OM_auto_grid`
+
+```{r autokriging-grid, eval=FALSE}
+# Load the library
+
+# Auto-run the kriging
+OM_auto_grid <- ______(
+  OM_muns ~ X + Y, 
+  input_data = ______, 
+  new_data = _______, 
+  model = "Mat"
+)
+
+# Remember predictions from manual kriging
+plot(OM_grid)
+
+# Plot predictions and variogram fit
+plot(OM_auto_grid)
+
+# Compare the variogram model to the earlier one
+v_model
+OM_auto_grid$var_model
+```
+
+
+
+Lovely result! The scale in prediction is inverse (dark areas show high organic-matter content) but otherwise the result is practically identical to the plot you created manually in task 3 above. 
+Automated kriging gives you a lot of modeling power for not much effort.
