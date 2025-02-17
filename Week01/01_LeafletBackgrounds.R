@@ -112,7 +112,7 @@ library(leaflet)
 # gs4_deauth() # if the authentication is not working for you
 
 places <- read_sheet("https://docs.google.com/spreadsheets/d/1PlxsPElZML8LZKyXbqdAYeQCDIvDps2McZx1cTVWSzI/edit#gid=1817942479",
-                     range = "SA2024",
+                     range = "SA2025",
                      col_types = "cccnncnc")
 glimpse(places)
 
