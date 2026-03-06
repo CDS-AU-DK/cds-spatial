@@ -1,0 +1,320 @@
+---
+title: "Network Travel in Aarhus"
+author: "Adela Sobotkova"
+date: "2025-10-17"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+This script is based on Luuk van der Meer's presention from UseR2024 in Salzburg, travel along a network. https://luukvdmeer.github.io/UseR2024/notebook.html
+
+```{r load_libraries}
+library(sfnetworks)
+library(sf)
+library(tidygraph)
+library(tidyverse)
+library(osmdata)
+library(slopes)
+library(raster)
+library(units)
+library(mapview)
+```
+
+# 1. Get OpenStreetMap data
+In this step, we use the `osmdata` package to retrieve data from OpenStreetMap. This package basically provides an R interface to the Overpass API of OpenStreetMap. First, we set a point on Den Gamle By and draw a circular buffer around it with a radius of 3km, which will serve as our area of interest. Feel free to switch this to your area of choice.
+
+```{r setup_study_area}
+venue <-sf::st_sfc(sf::st_point(c(10.193481442350198,56.15875458855773)), crs = 4326)
+area <-sf::st_buffer(venue, units::set_units(3, "km"))
+mapview(area)
+```
+
+Now we query all streets within our area of interest from OpenStreetMap. In OpenStreetMap, streets are those features that have a value for the highway key. In R, they will be represented by an sf data frame with linestring geometries. Since some streets may be drawn as a closed polygon (like a square or a roundabout) we convert polygon borders into linestrings, before extracting only the linestrings from the API response. Finally, we cut streets at the edge of our area of interest and make sure all of them are single linestrings, meaning that the different parts of multi-linestrings will be seen as different street segments (note that to do this properly we first need to cast everything to multi-linestrings).
+
+```{r query_osm_streets, eval = FALSE}
+streets <- osmdata::opq(sf::st_bbox(area)) %>%
+  osmdata::add_osm_feature(key = "highway") %>%
+  osmdata::osmdata_sf() %>%
+  osmdata::osm_poly2line() %>%
+  purrr::pluck("osm_lines") %>%
+  sf::st_intersection(area) %>%
+  sf::st_cast("MULTILINESTRING") %>%
+  sf::st_cast("LINESTRING")
+
+```
+
+```{r load-streets, echo = FALSE}
+# saveRDS(streets, "../data/DGB_streets_osm.rds")
+streets <- readRDS("../data/DGB_streets_osm.rds")
+streets <- streets %>% 
+  dplyr::select(osm_id, highway)
+```
+
+
+
+In a similar way, we also query all restaurant or gym locations within our area of interest. Whatever you wish to  serve later on as the destinations in our accessibility analysis. In OpenStreetMap, restaurants can be identified as those features having the value restaurant for the amenity key. They are represented as points instead of linestrings.
+
+However, shelter locations do not yet exist in OSM, and so we will load our own points for public  (BDG) and private (SR) shelters (safe rooms/ fortified rooms).
+
+```{r load_custom_point_data}
+# betondaekninggrave
+BDG <- read_csv("https://raw.githubusercontent.com/MELICA-AU/shelter-data/refs/heads/master/output_data/BDG_long.csv") %>% 
+  dplyr::select(id, BDnr, Type, Capacity, Location_startdate, decade, longitude, latitude) %>% 
+  filter(!is.na(longitude)) %>% 
+  filter(Location_startdate < 1960) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+mapview(BDG)
+
+# sikringsrum
+SR <- st_read("https://raw.githubusercontent.com/MELICA-AU/shelter-data/refs/heads/master/output_data/SR.geojson") %>% 
+  st_transform(4326)
+```
+
+Let us look at the result: a circle of lines with SR represented by red points
+
+```{r plot_area_with_custom_points}
+par(mar = c(0, 0, 0, 0))
+plot(sf::st_geometry(streets))
+plot(sf::st_geometry(SR %>%st_intersection(area)), col = "red", pch = 20, cex = 0.5, add = TRUE)
+plot(sf::st_geometry(BDG %>%st_intersection(area)), col = "orange", pch = 20, cex = 1, add = TRUE)
+```
+
+# 2. Estimate cycling travel times
+In this step, we estimate cycling travel times for each street segment. These are computed (obviously) as length / speed. First, we compute the length in kilometers of the street segments.
+
+```{r calculate_street_lengths}
+streets$length <-sf::st_length(streets) %>%
+  units::set_units("km")
+
+plot(dplyr::select(streets, length))
+```
+
+For the cycling speed, we define a default speed which we adjust based on the gradient of the street segment. To do so, we first need to estimate the gradient of each street segment. This requires a Digital Elevation Model (DEM), which basically is a spatial grid covering an area and storing an elevation value for each cell. We use a DEM for Denmark with a 10m resolution, available as open data from the dataforsyning in EPSG 4326. You still need to crop the full version of it in the data folder of this repository, which we load with the raster package. To estimate gradients of linestrings with this DEM, we use the `slopes` package. We use anisotropic / directed travel.
+
+```{r estimate_street_gradients}
+dem <- raster("../data/DNK_msk_alt.grd") 
+dem <- crop(dem, st_bbox(area))
+gradients <- slopes::slope_raster(streets, dem, directed = TRUE) * 100
+
+```
+
+Now we can set a speed of each street segment, based on its gradient. We use a default speed of 20 km/h. An uphill gradient decreases this speed, and a downhill gradient increases this speed, all until a given minimum and maximum speed of respectively 5 km/h and 30 km/h. For reasons of simplicity, we will just model a linear relation between gradient and speed, adapted from Parkin & Rotheram (2010).
+
+```{r calculate_cycling_times}
+estimate_speed <-function(gradient, default = 20, max = 30, min = 5) {
+  ifelse(  # is gradient less than 0? if yes go to downhill, if no uphill
+    gradient < 0, 
+    min(default + 0.8 * abs(gradient), max), # downhill
+    max(default - 1.4 * gradient, min) # uphill
+  )
+}
+
+streets$speed <-sapply(gradients, estimate_speed) %>%
+  units::set_units("km/h")
+
+plot(dplyr::select(streets, speed))
+```
+
+Now we have the lengths and speeds computed, we can simply compute the estimated travel time of cyclists for each street segment, in minutes.
+
+```{r define_cycling_suitability_function}
+streets$time <-units::set_units(streets$length / streets$speed, "min")
+
+plot(dplyr::select(streets, time))
+```
+
+```{r save-streets, echo=FALSE}
+# st_write(streets, "../data/aarhus_streets_enriched.geojson")
+```
+
+# 3. Construct a routable street network
+In this step, we convert the street centerlines into a routable network structure. This basically means that we make it explicit which street segments share an endpoint, such that we know how streets are connected, and hence, how someone can travel from A to B. This can be done very easily with the `sfnetworks` package. Note that for now we simply assume each street can be traveled in both directions, and the network is therefore undirected.
+
+```{r create_routable_network}
+network <-sfnetworks::as_sfnetwork(streets, directed = FALSE)
+
+par(mar = c(0, 0, 0, 0))
+plot(network, cex = 0.5)
+```
+
+However, streets in OpenStreetMap are not always mapped with a network structure in mind. It happens often that connected street segments cross each other without sharing an endpoint. This results in many disconnected sets of streets in the network, as shown below. Even our small network has over 5000 disconnected components, with the largest of them containing around 20% of all nodes.
+
+```{r count_network_components}
+tidygraph::with_graph(network, tidygraph::graph_component_count())
+```
+
+```{r analyze_network_connectivity}
+node_count_all <-network %>%
+  tidygraph::with_graph(tidygraph::graph_order())
+
+node_count_largest <-network %>%
+  tidygraph::convert(tidygraph::to_largest_component) %>%
+  tidygraph::with_graph(tidygraph::graph_order())
+
+round(node_count_largest / node_count_all * 100)
+```
+
+Luckily, the `sfnetworks` package contains functions to pre-process and clean networks. One of them is `to_spatial_subdivision()`, which connects streets when they share internal vertices rather than only endpoints. This results in a network that still has some disconnected components (which is to be expected since we cut the network at the buffer boundaries), but with the largest of them containing almost all nodes.
+
+Tip
+There are many more network pre-processing and cleaning functions in `sfnetworks`. See the `sfnetworks documentation` for details.
+```{r preprocess_network_connectivity}
+network <-network %>%
+  tidygraph::convert(sfnetworks::to_spatial_subdivision)
+
+par(mar = c(0, 0, 0, 0))
+plot(network, cex = 0.5)
+
+tidygraph::with_graph(network, tidygraph::graph_component_count())
+
+node_count_all <-network %>%
+  tidygraph::with_graph(tidygraph::graph_order())
+
+node_count_largest <-network %>%
+  tidygraph::convert(tidygraph::to_largest_component) %>%
+  tidygraph::with_graph(tidygraph::graph_order())
+
+round(node_count_largest / node_count_all * 100)
+```
+
+Now we can select the largest component without having to worry we loose a lot of data.
+```{r select_largest_network_component}
+network <-network %>%
+  tidygraph::convert(tidygraph::to_largest_component)
+
+par(mar = c(0, 0, 0, 0))
+plot(network, cex = 0.5)
+```
+
+# 4. Compute accessibility of shelters
+In this step, we compute a simple cumulative opportunities accessibility metric to find out how many shelters can be reached from our venue within a given time threshold. For that, we use `sfnetworks` to compute travel times between the venue and all shelters, and select those shelters that are accessible within the time threshold. The threshold we use is 5-6 minutes.
+
+
+Let's check if data is ready for time calculation:
+```{r validate_network_data}
+# Are all geometries valid?
+any(!st_is_valid(network))
+
+# Inspect the network for NaN values in the "time" weights
+any(is.na(network %>% activate("edges") %>% pull(time)))
+
+# List edges with NaN time values
+network %>%
+  activate("edges") %>%
+  filter(is.na(time)) %>%
+  as_tibble()
+
+#Filter out invalid edges (e.g., NaN values in the "time" attribute)
+valid_network <- network %>%
+  activate("edges") %>%
+  filter(!is.na(time))  # Keep only edges where time is not NaN
+#saveRDS(valid_network, "../data/DGB_valid_network_osm.rds")
+```
+
+
+```{r plot_network_elements}
+plot(dem)
+plot(streets$geometry, add = TRUE);
+
+
+plot(streets["time"])
+plot(BDG|>st_intersection(area), add =TRUE) 
+
+```
+
+```{r compute_accessibility_to_shelters}
+times <-valid_network %>%
+  sfnetworks::st_network_cost(venue, BDG|>st_intersection(area), weights = "time")
+
+access <- BDG[which(times < units::set_units(6, "min")), ]
+
+nrow(access)
+
+par(mar = c(0, 0, 0, 0))
+plot(valid_network, cex = 0.5)
+plot(sf::st_geometry(access), col = "orange", pch = 20, cex = 2, add = TRUE)
+plot(venue, col = "red",pch = 20, cex = 2.5, add = TRUE)
+```
+
+
+So, if you live in DGB, you have quite a choice of shelters! 
+
+# 5. Pull out and view one route
+
+What if we want to see the actual network path to one of the shelters?
+```{r}
+library(sfnetworks)
+library(dplyr)
+library(tidygraph)
+library(sf)
+
+valid_network <- valid_network %>%
+  activate("edges") %>%
+  mutate(weight = edge_length())
+
+
+# shortest path
+path <- st_network_paths(
+  valid_network,
+  from = venue,         # den gamle by
+  to = access[1, ],     # shelter
+  weights = "time"
+)
+
+# Extract and plot the route
+route_edges <- valid_network %>%
+  activate("edges") %>%
+  slice(path$edge_paths[[1]]) %>%
+  st_as_sf()
+
+# Inspect the route
+  mapview::mapview(route_edges, color = "red", lwd = 4) +
+  mapview::mapview(venue, col.region = "blue", cex = 8) +
+  mapview::mapview(access[1, ], col.region = "green", cex = 8)
+```
+
+
+
+# Remarks
+## 1. This example is simplified
+In this notebook we often used simple examples. In reality, accessibility of urban street networks is much more complex, with many factors at play.
+
+## 2. We only touched upon the tip of the R iceberg
+We show a few R packages that are useful in the analysis of urban street networks. However, there are much more out there. The transport planning community in R is full of nice and talented people that share great work. Some examples:
+
+We showed a few R packages that are useful in the analysis of urban street networks. However, there are much more out there. The transport planning community in R is full of nice and talented people that share great work. Some examples:
+
+- [dodgr](https://github.com/UrbanAnalyst/dodgr): A package for fast route calculations and flow aggregations on street networks based on C++ code.
+- [cpprouting](https://github.com/vlarmet/cppRouting): A package for fast route calculations and traffic assignment on street networks based on C++ code.
+- [osrm](https://github.com/riatelab/osrm): An R interface to the Open Source Routing Machine, a routing software for OpenStreetMap written in C++.
+- [openrouteservice](https://github.com/GIScience/openrouteservice-r): An R interface to Openrouteservice, an open-source routing software written in Java.
+- [gtfsrouter](https://github.com/UrbanAnalyst/gtfsrouter): A package for fast route calculations on public transport time tables based on C++ code.
+- [r5r](https://github.com/ipeaGIT/r5r): An R interface to the R5 routing software for multi-modal routing.
+- [opentripplanner](https://github.com/ropensci/opentripplanner): An R interface to the OpenTripPlanner routing software for multi-modal routing.
+- [m4ra](https://github.com/UrbanAnalyst/m4ra): A package for multi-modal routing based on C++ code (still in development).
+- [gtfsio](https://github.com/r-transit/gtfsio): A package to read, represent and write General Transit Feed Specification data on public transport time tables.
+- [gtfstools](https://github.com/ipeaGIT/gtfstools): A package to edit and analyze General Transit Feed Specification data on public transport time tables.
+- [stplanr](https://github.com/ropensci/stplanr): A multi-purpose package for sustainable transport planning with functions for origin-destination matrix analysis, routing, and more.
+- [accessibility](https://ipeagit.github.io/accessibility/): A package that implements different ways to compute transport accessibility metrics.
+
+Read also the *Transportation* chapter of the open-source book [Geocomputation with R](https://r.geocompx.org/transport.html).
+
+## 3. There is more to come
+Open-source projects like `sfnetworks` are always in development. The sfnetworks team are currently working on a new version of the package, hopefully to be released in fall 2025. A new package `bikesuiter` is under way which implements different ways to analyze the bicycle suitability of street networks. Stay tuned!

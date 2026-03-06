@@ -1,0 +1,83 @@
+---
+title: "Week 06 - Assessing Populations at Risk"
+author: "Adela Sobotkova"
+date: "16-February-2025 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(sf)
+library(mapboxapi)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+## Task 3: Assessing Risk with Demographic data
+This script continues on `05_NetworkDistancesDK.Rmd`. 
+The task is to explore the most vulnerable parts of Midtjylland where 25%+ households don't have cars and are far from the nearest hospital.
+
+### Carless Household data from DS
+Number of households without cars are available via Danmark Statistik via the  "Familiernes bilrådighed (faktiske tal) efter rådighedsmønster, område" dataset. The "familier uden biler" sits in csv format as a hh_nocars.csv with the numbers and percentages corresponding to 2020 and 2021 respectively. Overall, there were 1178935 households without a car in 2020 and 1166668 in 2021. The number of course drops with time, while number of car-owning households go up steadily from 1,896,387 in 2020 to 1,929,511 in 2021
+
+* Load municipality data 
+* Create `no_cars_pct_mun` object by joining the `hh_nocar` object to the municipalities with `inner_join()`. Beware to preserve the spatial dimension of the `munic` for later use in a map. Look up the function to know how exactly to specify the shared columns. You may also want to rename the `pop` columns first so they are easier to map to `munic` 
+
+```{r households-mun-nocars}
+## YOUR CODE HERE
+```
+
+* In the next chunk of code we inspect the municipalities in a map to see if the names between the datasets overlap
+
+* Create a thematic map of `no_cars_pct_mun` by filtering municipalities that have 25+ percent of households without a car. I recommend `mapview()`, but you are free to use your favorite library.  Mapview usually works well at the end of tidyverse pipeline but as it may interfere with other libraries, I recommend saving the script and upon restart, running only the `mapview()` code chunk so as to avoid interference. 
+
+* *Which areas in Midtjylland have 25 and more percent of carless households?*
+* If you notice any municipalities missing, reconcile their spelling in the `municipality` and `hh_nocars` objects.
+
+```{r mapview-thematic-map}
+## YOUR CODE HERE
+```
+Gosh, that was a ton of wrangling! But we are nearly there! :)
+
+
+## Spatial overlay with sf
+
+Spatial overlay is a very common operation when working with spatial data. It can be used to determine which features in one spatial layer overlap with another spatial layer, or extract data from a layer based on geographic information. In R, spatial overlay can be integrated directly into tidyverse-style data analysis pipelines using functions in sf. In our example, we want to determine the areas in Midtjylland with the greatest proportion of households without access to a car that also are beyond a 20 minute walk/cycling route from a hospital.
+
+To do this, follow these steps:
+
+* doublecheck that the coordinate reference system of the `no_car_pct_mun` dataset is 4326, the same CRS used by the isochrones;
+* filter municipalities that fall within Midtjylland;
+* extract only those municipalities with a percentage of households without cars of 25 percent or above;
+* union your isochrones before the final step
+* use the `st_difference()` function to “cut out” areas from those municipalities that overlap the 20-minute cycling isochrones.
+* Once you complete this operation, visualize the result in your Mapbox map.
+
+
+```{r risk-areas}
+## YOUR CODE HERE
+
+```
+
+
+### Questions:
+
+*1. Are there any areas that are located beyond a 20-minute bike-/carride of a hospital that have proportionally lower access to cars?* 
+
+*2. Where are they and what is their aggregate area?*
+
+*3. How would you ensure residents in these areas have reasonable access to hospitals?*
+
