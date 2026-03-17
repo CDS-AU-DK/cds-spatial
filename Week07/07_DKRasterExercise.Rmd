@@ -1,0 +1,370 @@
+---
+title: "08 - Raster manipulation and analysis - Danish Edition"
+author: "Adela Sobotkova"
+date: "06/02/2022 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+## What you learn today? Wrangle your rasters
+
+In these exercises, you learn how to work with raster data in R, specifically, how to 
+
+1. review and recode problematic raster values
+2. crop raster extent and mask it to a boundary specified by a polygon
+3. reduce raster resolution
+4. extract values from raster by points, lines or polygons
+5. overlay multiple rasters and do raster algebra
+6. inspect prominence at locations and sort it (adapted to viewshed analysis)
+7. sum raster values across vector shapes (adapted to cell tower coverage)
+
+## Welcome to Denmark - Aarhus Municipality, and Sea Rise Scenario
+
+In terms of data, today you will be working with elevation data from `elevation_3s()` (providing a tile centered on Aarhus), a satellite image `Aarhus.tif`, administrative boundaries for Denmark to extract Aarhus municipality, and building/facility data for flood analysis. We'll focus on a sea rise scenario to make the exercises relevant to climate change impacts.
+
+* Elevation data: Obtained via `elevation_3s()` from the elevatr package, providing a digital elevation model tile for Aarhus. Values below 0 (sea) may be encoded as -9999 or similar.
+* Satellite image: `Aarhus.tif` is a multi-band satellite image for Aarhus municipality.
+* Administrative data: Use Danish administrative boundaries to extract Aarhus municipality.
+* Buildings: Use `mystery/a_bbr_1990.shp` for facilities/buildings in Aarhus to assess flooding.
+* skyscrapers: For viewshed analysis, we'll use a proxy or hypothetical points (e.g., skyscrapers as stand-ins for towers) or suggest using available point data.
+
+# Task 1: Access raster data values
+Raster data can be very big depending on the extent and resolution (grid cell size). In order to deal with this the `rast()` function is designed to only read in the actual raster values as needed. To show that this is true, you can use the `inMemory()` function on an object and it will return `FALSE` if the values are not in memory. If you use the `head()` function, the `terra` package will read in only the values needed, not the full set of values. The raster values will be read in by default if you perform spatial analysis operations that require it or you can read in the values from a raster manually with the function `getValues()`.
+
+## Instructions
+
+* Activate `terra` and `geodata` libraries
+* Load elevation data centered on Aarhus using `elevation_3s()`. Use coordinates around Aarhus (e.g., lon=10.2, lat=56.15, z=9 for ~1km resolution).
+* Inspect its extent and metadata.
+* Use the `inMemory()` function on the elevation object to determine if the data has been read in.
+* Use the `head()` function to look at the first few values from the elevation raster.
+* Use the `getValues()` function on the elevation object to read in all the data.
+* Use the `hist()` function to create a quick histogram of the elevation values. Note any problematic values like -9999 (sea areas).
+
+```{r access-raster, echo=TRUE, eval=FALSE}
+# libraries
+library(terra)
+library(geodata)
+library(tidyverse)
+
+# Read in the elevation layer (centered on Aarhus)
+elevation <- elevation_3s(_______,_________, 
+                           path = "____")
+
+# Check if the data is in memory
+inMemory(elevation)
+
+# Use head() to peak at the first few records
+head(values(elevation))
+
+# Use getValues() to read the values into a vector
+vals <- values(elevation)
+
+# Use hist() to create a histogram of the values
+hist(vals)
+```
+
+You now know that the `terra` package only reads in raster values as needed to save space in memory. You can get the values manually using the `values()` function.
+
+Now, a new question arises, why are so many values encoded as below zero? 
+
+# Task 2: Crop and mask rasters on the basis of other spatial objects
+Mask and crop are two similar operations that allow you to limit your raster to a specific area of interest. With `crop()` you limit the extent of your raster to that of your focus area.  With `mask()` you essentially place your area of interest on top of the raster and any raster cells outside of the boundary are assigned `NA` values. 
+
+The elevation tile covers a large area, but we are primarily interested in Aarhus municipality. In this exercise you will use the extent of Aarhus municipality to crop and mask the elevation raster.
+
+On some OSs, `terra` package does not support `sf` objects. This should not happen now, but if you encounter difficulty with raster:vector interactions, it helps to know that you can convert the vector to `SpatVector` object with, for example, `vect()`.
+
+## Instructions I - Crop raster by the extent of Aarhus municipality
+
+* Load `sf` and `geodata` libraries
+* Create `aarhus` object from Danish administrative data using `geodata::gadm()` for Denmark, then filter to Aarhus municipality.
+* Verify that `aarhus` CRS matches the `elevation` CRS and fix with `st_transform()` if not.
+* Crop the `elevation` layer by the `aarhus` object using the `crop()` function and create a smaller `elev_aarhus` object
+* Plot the `elev_aarhus` and `aarhus` together.
+
+```{r aarhus-crop, eval = FALSE}
+# libraries
+library(sf)
+library(geodata)
+
+# Load municipality and transform to match elevation CRS if needed
+aarhus <- _________(_________________) %>% 
+  st_as_sf() %>% # convert to sf?
+  ________    # pluck out Aarhus
+  #st_transform(aarhus, crs(elevation))
+
+# Crop the elevation layer by aarhus
+elev_aarhus <- crop(_________,________)
+
+# Plot
+plot(elev_aarhus)
+plot(_________(aarhus), col = "white", add = TRUE)
+```
+
+## Instructions II - Mask raster by Aarhus municipality
+
+* Mask the `elev_aarhus` layer with `aarhus` and save as `elev_aarhus_mask`. This may take a couple of seconds.
+* Review the plot of `elev_aarhus_mask`. 
+
+```{r plot-elevation, eval=FALSE}
+# Mask the elev_aarhus layer with aarhus and save as elev_aarhus_mask
+elev_aarhus_mask <- mask(_________,_____________)
+
+# Plot the elev_aarhus_mask -- this is a raster!
+plot(elev_aarhus_mask)
+
+```
+
+Nice! You ensured that layers had the same CRS, you cropped the raster, and masked to Aarhus municipality. Finally, you created current and post-sea-rise elevation views.
+
+### Question: 
+ 
+*1. What extent does the elevation raster default to after cropping vs masking by Aarhus municipality?*
+
+*2. Why do we mask after cropping?*
+
+# Task 3: Change values: handle missing or bad data values in rasters / model sea rise
+There are many situations where you might need to recode raster values. You may want to change the outlier/negative values to `NA` for example. In the `terra` package, reclassification is performed with the `classify()` function.
+
+In the `elevation` grid in your data/ folder (`DNK_msk_alt.grd`), the values are meters above sea level and are supposed to range between 0 and positive values. Anything below 0 or -9999 or -Inf should be an `NA` (sea areas or no_data). In this exercise you will assign any values below 3m to `NA` in order to simulate change in coast area of Denmark with sea rise.
+
+## Instructions
+
+* Check that the package `terra` and the object `elevation` are loaded in your workspace.
+* Plot the `elevation` raster using `plot()`.
+* Set up a three-column matrix with the `cbind()` function and values -Inf, 0, NA (or for sea rise: -Inf, 3, NA).
+* Use the matrix and `classify()` to reclassify values below 0 (or 3m) to `NA`. You will need to use the argument `rcl`.
+* Plot the reclassified elevation layer to confirm there are no values below the threshold.
+
+```{r reclass, eval=FALSE}
+# Plot the elevation layer to see the legend values
+library(raster)
+elev <- raster("../data/DNK_msk_alt.grd")
+
+# For sea rise: reclassify with 3m threshold and mask
+
+# Set up the matrix [from, to, becomes] - for sea areas or sea rise
+rcl_searise <- cbind(-Inf, ____, NA)
+
+# Apply the matrix
+elev_searise <- raster::reclassify(elev, ___=____________) # with raster
+plot(elev_searise)
+
+aarhus_searise <- terra::classify(elev_aarhus, rcl_searise) # with terra
+arhus_searise_mask <- mask(aarhus_searise, aarhus)
+plot(arhus_searise_mask)
+```
+
+Good work! Knowing how to reclassify rasters will come in handy. When you get a chance you should review the help for `classify()` particularly the part that discusses how to specify the `rcl` argument. The three-column approach from this exercise is most common but there are other approaches.
+
+
+# Task 4: Extract raster values by location
+Beyond simply masking and cropping you may want to know the actual cell values at locations of interest. You might, for example, want to know the elevation at each building location or perhaps which buildings get flooded by sea rise.
+
+Usefully, and you'll see this in a later analysis, you can feed `extract()` a function that will get applied to extracted cells. For example, you can use `extract()` to extract raster values by point, line, polygon, or neighborhood and with the `fun = mean` argument it will return an average cell value by neighborhood.
+
+## Instructions
+
+* Ensure `aarhus` and the original Aarhus elevation objects are still in memory.
+* Load buildings data from `mystery/a_bbr_1990.parquet`.
+* Use the `terra` function `extract()` to determine the elevation at each of the buildings. Assign the extracted value into an `elev` column in the buildings object.
+* For sea rise, identify buildings with elev < 3m (or NA, indicating flooded).
+* Look at the buildings elevation column through the `plot()` function as well as histogram. Do the `extract()` results make sense?
+
+```{r extract, eval=FALSE}
+# Load buildings
+library(___________)
+buildings <- _______________("../data/mystery/a_bbr_1990.parquet")
+
+# Check if you need to transform to match raster CRS
+plot(elev_aarhus_mask)
+all.equal(_____(buildings), ______(elev_aarhus_mask))
+
+buildings <- st_transform(buildings, ____________________)
+
+# Extract the elevation values at the building locations 
+buildings$elev <- terra::extract(elev_aarhus_mask, buildings)________
+
+# Look at the buildings and extraction results
+plot(buildings["elev"]); plot(buildings %>% filter(elev < 3) %>% st_geometry(), add = T)
+
+# Identify flooded buildings
+flooded_buildings <- buildings[buildings$elev <3, ]
+```
+
+Great! `terra::extract()` is a very useful tool. It can be used with polygons as well as points and lines, and the result can be written out as a separate vector or added to an existing object as a column. 
+
+## Geocode Aarhus Skyscrapers
+
+Before performing viewshed analysis, let's geocode the locations of some of the 10 tallest buildings in Aarhus. We'll normalize their addresses and use the `opencage` library to get coordinates.
+
+### Instructions
+
+* Create a data frame with the skyscraper names and normalized addresses.
+* Install and load the `opencage` library (requires API key; sign up at opencage.com).
+* Use `opencage_forward()` to geocode each address.
+* Convert the results to an `sf` object with points.
+
+```{r geocode-skyscrapers, eval=FALSE}
+# Install opencage if needed
+# install.packages("opencage")
+
+library(opencage)
+library(dplyr)
+library(sf)
+
+
+# Data frame of skyscrapers with normalized addresses
+skyscrapers <- data.frame(
+  rank = 1:7,
+  name = c("Mindet 6", "Lighthouse 2.0", 
+           "Frederiks Plads Office Building", "Pakhusene - Mariane Thomsens Gade 2F", "Æggepakkeriet", "Pakhusene - Mariane Thomsens Gade 6", "Pakhusene - Mariane Thomsens Gade 1C"),
+  address = c("Mindet 6, 8000 Aarhus C", "Lighthouse 2.0, Østbanegade 2, 8000 Aarhus C", "Frederiks Plads 1, 8000 Aarhus C", "Mariane Thomsens Gade 2F, 8000 Aarhus C", "Mejlgade 50, 8000 Aarhus C", "Mariane Thomsens Gade 6, 8000 Aarhus C", "Mariane Thomsens Gade 1C, 8000 Aarhus C")
+)
+
+# Geocode each address (set your API key)
+# opencage_key("YOUR_API_KEY_HERE")
+oc_config()
+
+geocoded <- oc_forward_df(placename = skyscrapers$address, countrycode = "DK", limit =1, no_annotations = TRUE)
+
+
+skyscrapers_sf <-  geocoded %>%
+  st_as_sf(coords = c("__________", "_________"), crs = 4326) %>% 
+  st_transform(crs = ____________) %>% 
+  slice(-2)  # Lighthouse does not georeference well!
+mapview(skyscrapers_sf)  
+```
+
+# Task 5: Viewshed Analysis for skyscrapers
+You will now use the `elevation` layer and perform viewshed analysis for skyscrapers. Viewshed determines visible areas from a point, simulating inter-visibility. For a sea rise scenario, we can compare current vs post-sea-rise viewsheds. Alternatively, overlay elevations to find areas affected by sea rise.
+
+What you will do in this exercise is: perform viewshed from hypothetical cell tower locations (using skyscrapers as proxies) and overlay with sea rise impacts.
+
+## Instructions
+
+* Make sure the `elev_aarhus_mask` object exists in memory.
+* Use skyscrapers as proxy .
+* Perform viewshed analysis using `terra::viewshed()` for a sample tower.
+* Overlay current and sea-rise elevations to show affected areas.
+* Plot the result.
+
+```{r overlay, eval=FALSE, echo=TRUE}
+# convert to planar
+elev_a25832 <- project(elev_aarhus_mask, "EPSG:25832")
+
+# Perform viewshed for one skyscraper
+viewshed_current <- terra::viewshed(elev_a25832, st_coordinates(skyscrapers_sf[1, ]))
+
+
+# Overlay or compare
+plot(viewshed_current)
+```
+
+Congratulations! You've now learned to perform viewshed analysis, useful for visibility and coverage studies.
+
+### Questions:
+
+*3. What area is visually covered by each skyscraper?*
+
+# Task 6: Find the skyscraper tower with the largest viewshed area
+
+In the above exercise, we produced viewsheds for towers. Which tower has the largest visible area? Produce a list of towers sorted by coverage area and plot the top one.
+
+## Instructions
+
+* Check that you have the `skyscrapers` sf object and `elev_aarhus_mask` raster.
+* For each skyscraper, compute viewshed and calculate the area of visible cells within Aarhus municipality.
+* Sort by area and identify the top tower.
+* Plot the viewshed of the top tower.
+
+```{r eval=FALSE, echo = FALSE}
+# To compute viewsheds for all skyscrapers, use a loop or lapply
+viewsheds_current <- lapply(seq_len(nrow(skyscrapers_sf)), function(i) {
+  viewshed(elev_a25832, st_coordinates(skyscrapers_sf[i, ]))
+})
+
+# Compute areas
+areas <- sapply(viewsheds_current, function(v) sum(values(v) == 1, na.rm = TRUE) * prod(res(v)))
+
+# Sort and find top
+top_index <- which.max(areas)
+top_skyscraper <- skyscrapers_sf[top_index, ]
+
+# Plot the viewshed of the top skyscraper
+plot(viewsheds_current[[top_index]])
+```
+
+
+
+# Task 7: Show the viewshed over the city grid
+
+Visualize the viewshed over the city satellite image `Aarhus.tif`. For fast viewing it is perhaps worthwhile to reduce the satellite image resolution.
+
+## Reduce the raster resolution (grid cell size) using aggregate()
+Rasters, such as orthophotos, often come in resolutions far greater than you need. To reduce the computational load when running analyses, or when developing the right approach, you should use a reduced resolution raster.
+
+The function to reduce resolution in rasters is `aggregate()` which, as you might guess, aggregates grid cells into larger grid cells using a user-defined function (for example, mean or max). The function used to aggregate the values is determined by the `fun` argument (the default being mean) and the amount of aggregation is driven by the `fact` argument (the default being 2).
+
+## Instructions
+
+* Load the `Aarhus.tif` satellite image from data/.
+* Plot the file you read in with the appropriate function for a multi-band raster.
+* Determine the raster resolution using `res()` and number of raster cells in the layer with `ncell()`.
+* Aggregate the satellite image using the default for `fun` and with a `fact` to achieve ~10m resolution (calculate based on original res) and save the new raster to `aarhus_small`.
+* Plot the new raster for comparison to the old version.
+* Determine the new raster resolution and the number of raster cells.
+
+```{r aggr, eval=FALSE}
+# Load the satellite raster
+aarhus_sat <- rast("../data/Aarhus_1m.TIF")
+
+# Plot the satellite raster
+plotRGB(aarhus_sat)
+
+# Determine the raster resolution
+res(aarhus_sat)
+
+# Determine the number of cells
+ncell(aarhus_sat)
+
+# Aggregate the raster to ~10m (fact depends on original res, e.g., if 1m, fact=10)
+aarhus_small <- ______________(aarhus_sat, fact = 10)
+
+# Plot the new layer
+plotRGB(aarhus_small)
+
+# Determine the new raster resolution
+res(aarhus_small)
+
+# Determine the number of cells in the new raster
+ncell(aarhus_small)
+```
+
+Now that you have the fast-rendering satellite image `aarhus_small`, plot the largest viewshed over it.
+
+```{r}
+# YOUR CODE
+```
+
+
+Lovely job! In this example you read in a raster and then converted it to a lower resolution raster to save on the size of the object and ultimately computation power required.
+
