@@ -1,0 +1,518 @@
+---
+title: "08 - Remote Sensing with Landsat package"
+author: "Adela Sobotkova"
+date: "06/01/2021 updated `r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Working with satellite imagery in R
+
+In this exercise you learn to use the functions of the `landsat` package to process satellite imagery, specifically, how to: 
+
+* streamline histograms so you can combine images
+* manipulate multi-band imagery,
+* extract and create new data from images, such as NDVI and SAVI
+* classify image values using `kmeans` unsupervised algorithm to detect similar areas
+* segment features in satellite imagery
+
+# Task 1: Set up your workspace
+
+Start by installing the required packages first. 
+`rasterVis` and `RColoBrewer` are used for visualisation of rasters, `lattice` and `latticeExtra` for extra graphical utilities, while `landsat` provides the imagery samples and `rgl` allows for 3D visualisation. 
+
+```{r packages}
+library(lattice)
+library(latticeExtra)
+library(RColorBrewer)
+library(rasterVis)
+library(rgl)  # macs might need another prerequisite
+library(landsat)
+library(terra)
+```
+
+# Task 2: Pre-processing of Landsat datasets 
+
+Landsat packages offers sample Landsat satellite imagery decomposed into single bands, and labelled by the month of capture (25 November 2002). You will load and practice raster analysis with these 300x300 pixel samples. 
+Note that each single band image shows as panchromatic (greyscale) with values ranging from 0 (white) to 255 (black), with the interim colors being shades of grey. This is unsigned 8 bit imagery. The number behind the filename (e.g. `nov3`) refers to the color band of the image: 1 = Green, 2 = Blue, 3= Red, 4 = Near-infrared. Once you combine these color bands and plot with `plotRGB()`, you can see the true- or false-color imagery depending on which color you load into which RGB channel. 
+
+The images are in the `SpatialGridDataFrame` format and need to be converted to `raster` format before manipulation.
+
+
+```{r plot-img-data}
+##load indvidual band image data from landsat package
+?nov
+
+#load band#3 red channel of the image
+data(nov3)
+plot(nov3)
+
+data(nov4)
+plot(nov4)
+
+data(nov7)
+plot(nov7)
+```
+
+
+# Task 3: Load elevation data and plot it in 3D (Adela to demo
+`dem` in the landsat package denotes a 'digital elevation model'. Once you load it you can convert it to Formal Raster Layer with `raster()` function and then continue processing using the usual raster package functions.
+
+`plot3D()` is a neat function in the `rasterVis` package, which opens a separate windows and plots elevation values in 3D space if present in the raster. You need to close the window if you want to update or plot another object.
+
+```{r dem}
+# Load and plot the digital elevation model in landsat package
+library(raster)
+data(dem)
+plot(dem)
+dem <- raster(dem)
+```
+
+## Plot in 3D with raster
+RasterVis package function `plot3D()` loads a neat 3D viewer, which opens in a new window
+If you have the `raster` library and don't see the `plot3D()` function working, enable the `rglwidget()`.
+```{r 3D, eval = FALSE}
+library(raster)
+library(landsat)
+rglwidget()
+plot3D(dem, rev=T, zfac=1)
+
+```
+ 
+I have not been able to get an equivalent 3D image with `terra` library
+
+# Task 4: Load and explore RGB data components
+```{r rgb}
+# let's load data for July and explore it 
+data("july1")
+data("july2")
+data("july3")
+data("july4")
+
+j1<-rast(july1) # blue
+j2<-rast(july2) # green
+j3<-rast(july3) # red
+j4<-rast(july4) # near-infrared
+
+## check out the image histogram	
+plot(j1)
+plot(j4)
+hist(j1, main="Band 1 - Blue of Landsat")	
+boxplot(j1, main="Band 1 - Blue of Landsat")		
+
+data(nov1)
+plot(nov1)
+n1 <- rast(nov1)
+hist(n1)
+
+```
+
+
+# Task 5: Plot RGB image
+
+```{r rgb-plot}
+library(terra)
+
+# Create a true-color composite (R = j3, G = j2, B = j1)
+myRGB <- c(j3, j2, j1)  # `c()` combines into a SpatRaster with multiple layers
+
+# Create a false-color composite (CIR: NIR = j4, R = j3, G = j2)
+myCIR <- c(j4, j3, j2)
+
+### let's see how the NIR, R, and G bands relate  (from lattice)
+names(myCIR) <- c("NIR", "Red", "Green")
+splom(myCIR, varname.cex = 1) # scatter plot matrix
+
+
+## better
+plotRGB(myRGB, stretch = "hist")
+plotRGB(myCIR,  stretch = "hist")
+```
+
+
+# Task 6: Manipulate image rendering by histogram stretching and cloud masking
+
+First, let's use histogram stretch
+```{r hist}
+## different stretches - here histogram based
+plotRGB(myRGB, stretch="hist") 
+plotRGB(myCIR, stretch="hist")
+```
+
+Next, let's try linear stretch
+```{r lin}
+## different stretches - here linear stretch 
+plotRGB(myRGB, stretch="lin", main = "True Color RGB") 
+plotRGB(myCIR, stretch="lin", main = "False Color CIR")  # in CIR red = green!
+
+```
+
+
+ *Any idea what the red color represents in myCIR?*
+
+Finally, drape one of the images over a 3D model. This bit can be a bit touchy, relies on the raster library and take a while to get to work. I tend to run the `plot3D()` lines alone to generate the 3D view in a pop-up window rather than rmarkdown output. Everytime you wish to refresh the view, you must **close** the pop-up window. 
+
+```{r dem-3d, eval=FALSE}
+## finally...
+# rglwidget()  # this widget helps get the first view rendered in rmarkdown, refreshing however is more tedious
+
+#?rglwidget()
+
+t <- plot3D(dem, col=rainbow(255)) ## you need to close RGL device manually first and then run this line!
+
+
+# Save it to a file.  This requires pandoc
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)
+
+plot3D(dem, drape = raster(nov7)) ## should drape image j4 over DEM, if problematic try in .R script and watch for a pop-up widget. Ask Adela to demo!
+
+```
+
+## We have a lot of clouds in the July image - mask them! 
+`RStoolbox` comes with a suite of pre-processing functions, including `cloudMask` to identify clouds in optical satellite imagery:
+
+```{r landscape-clouds}
+library(landsat)
+
+j1<-rast(july1) # blue
+j2<-rast(july2) # green
+j3<-rast(july3) # red
+j4<-rast(july4) # near-infrared
+
+# Create a false-color composite (CIR: NIR = j4, R = j3, G = j2, B = j1)
+myCIR <- c(j4, j3, j2, j1)
+
+# Rename the NIR, R, and G bands 
+names(myCIR) <- c("NIR", "Red", "Green", "Blue")
+```
+
+```{r cloud-index}
+# Calculate cloud index
+library(RStoolbox)
+library(ggplot2)
+
+cldmsk    <- cloudMask(myCIR, blue = 4, tir = 1) 
+ggR(cldmsk, 2, geom_raster = TRUE) # geom_raster plots faster, 2 indicates the mask
+```
+
+```{r cloud-mask-plot}
+# mask by threshold, region-growing around the core cloud pixels
+cldmsk_final <- cloudMask(cldmsk, threshold = 0.1, buffer = 5) 
+
+## plot cloudmask 
+library(ggplot2)
+ggRGB(myCIR, stretch = "lin") +
+  ggR(cldmsk_final[[1]], ggLayer = TRUE, forceCat = TRUE, geom_raster = TRUE) +
+  scale_fill_manual(values = c("yellow"), na.value = NA)
+```
+
+# Task 7: Create new information from satellite imagery: NDVI
+
+Let us calculate the Normalized Difference Vegetation Index (NDVI) and see where the vegetation grows most in our Landsat image:
+Remember the formula for NDVI is: (NIR - RED) / (NIR + RED)
+
+```{r ndvi}
+# prep imagery
+n3 <- rast(nov3) # RED
+n4 <- rast(nov4) # NIR
+
+ndvi <-  (n4 - n3) / (n4 + n3)
+ndvi
+plot(ndvi)
+
+# uncomment and run in 3D
+plot3D(dem, drape = raster(ndvi), zfac = 1.5)
+
+### remove values below zero
+ndvi[ndvi <= 0] <- NA
+plot(ndvi)
+```
+
+Now you can see the areas of the highest reflectance and thus most healthy vegetation in November
+
+
+# Task 8: Create new information from satellite imagery: SAVI
+SAVI stands for Soils Adjusted Vegetation Index, and this is another calibrated view of the ground.
+
+```{r savi}
+### another index SAVI (soil adjusted vegetation index)
+ndvi <-  (n4 - n3) / (n4 + n3)
+savi <-  (n4 - n3) / ((n4 + n3)*0.25) # with L=1 -> similar to NDVI
+
+### let´s compare visually
+par(mfrow=c(1,2))
+
+plot(savi, main="SAVI"); plot(ndvi, main="NDVI")
+par(mfrow=c(1,1))
+
+```
+
+# Task 9: Unsupervised Classification with k-means
+
+We would like to isolate and better see the clusters of growth within our image. We will run kmeans function on a composite image in order to cluster data based on similarity or similar groups!
+```{r prep-kmeans}
+# first, let's select an image and make it into a brick including ndvi 
+data(nov2)
+data(nov1)
+n2 <- rast(nov2)
+n1 <- rast(nov1)
+ndvi
+which(is.na(as.data.frame(ndvi))) # should be 0, rerun the ndvi creation if not.
+
+# create a new composite brick out of the available data
+myNewBrick <- c(n4,n3,n2,n1,ndvi)
+splom(myNewBrick)
+plot(myNewBrick)
+
+```
+Next, run the kmeans classification. Beware that the kmeans function does not tolerate NA/INF/NaN and similar values. Our new brick should not have any but in future classification remember that you need to get around them, either by exclusion or substitution via mean values.
+
+```{r kmeans}
+# Run kmeans classification on the values in your new brick 
+# Read on Thresholding here:  https://rspatial.org/raster/rs/3-basicmath.html#vegetation-indices
+ICE_df <- as.data.frame(myNewBrick)  
+set.seed(99)
+
+
+cluster_ICE <- kmeans(ICE_df, 4) ### kmeans, with 4 clusters
+str(cluster_ICE)
+# cluster_ICE <- cluster::clara(ICE_df, 4) ### another option, clara, with 4 clusters
+
+# convert cluster information into a raster for plotting
+clusters <- rast(myNewBrick)   ## create an empty raster with same extent than ICE
+clusters <- setValues(clusters, cluster_ICE$cluster) # convert cluster values into raster
+clusters
+plot(clusters)
+
+# uncomment to plot the clusters in 3D over the DEM
+# plot3D(dem, drape=clusters, col=c("white", "green", "blue", "yellow"))
+
+# calculate the average spectral signature of 1-4 bands of growth
+ICE_mean <- zonal(myNewBrick, clusters, fun="mean")  
+ICE_mean  # see the values for ndvi (layer) being most distinct
+
+```
+Note that you have aggregated the final cluster raster by using the `focal()` function using the `mean` function on the four clusters identified by `kmeans()` as similar.
+
+# Task 10: What is the trend in de-/afforestation?  - Individual tree crown segmentation 
+The ITC (Individual Tree Crowns) delineation approach finds *local* maxima within imagery that contains subtle color differences, such as the canopy image provided. The `itcIMG()` function designates these maxima as tree tops, then uses a decision tree method to grow individual crowns around the local maxima.
+
+The image we use is based on LiDAR (Light Detection and Ranging) in xyz format.
+To get the segmentation going you will need the `terra` and `itcSegment` packages
+```{r itcs}
+# install.packages("itcSegment")
+library(terra)
+library(itcSegment)
+
+forest <- rast("../data/imgData.tif")
+
+plot(forest)
+
+# Use the itcIMG() function to detect and grow the individual crowns
+?itcIMG()
+se <-itcIMG(forest, epsg=32632)
+summary(se)
+
+# What is the product of the function? Is it a raster or vector?
+se
+plot(se,axes=T)
+
+### Let´s overlay the image and the product of segmentation (run both lines)
+plot(forest)
+plot(se,axes=F,add=T, main = "Lidar image of forest with segmented tree-crowns")
+```
+
+
+# Task 11: Visualise the segmentation result in Leaflet
+
+You can probably do all of this yourself, but here is a hint about projecting the SpatVector, just in case:
+
+```{r itcs-plot}
+# What are we reprojecting and what to? geographical coordinates or?
+se      # it is a Spatial object
+crs(se) # what is its crs?
+
+# Project the SpatialVector using terra library
+se4326 <- project(se, "EPSG:4326")
+
+# ...then we can combine them with leaflet
+library(leaflet)
+leaflet() %>% 
+  addTiles() %>% 
+  addRasterImage(forest) %>% 
+  addPolygons(data=se4326, weight = 1, color = "black" )   # Tadaa
+```
+Can you figure out where this forested landscape is from?
+And how many tree crowns have you just detected in how big an area? What is the average tree density?
+
+
+# Task 12: a more demanding segmentation example with a bigger LIDAR image!
+And because we have it in the data/ folder, try with this larger example.
+```{r itcs-big, eval=FALSE}
+r <- rast("../data/myDem_subset.tif")
+r
+plot(r)
+?itcIMG()
+se_large <- itcIMG(r, epsg=25829, ischm=T) # can be a bit slow (2-3mins)
+summary(se_large)
+plot(se_large)
+plot(r);plot(se_large,axes=F, add=TRUE)
+
+# Adjust 'th' argument for excessive capture of small growth
+se_large5 <- itcIMG(r, epsg=25829, th = 5, ischm=T) # th - how low should algorithm be looking for canopy
+
+# Plot raster with axes (plotting SpatVectors with terra tends to duplicate axes)
+plot(r, axes = TRUE, main = "Forest LiDar with tree-crown overlay")
+
+# Add vector without drawing axes again
+plot(se_large5, border = "white", axes = FALSE, add = TRUE)
+
+
+```
+Again, what is the area of your raster and how many trees or bushes did you detect?
+Where do you think you are?
+
+## Want to see the result in Leaflet?
+```{r save-crowns}
+# Write a SpatVector to a Shapefile
+#writeVector(se_large5, "../data/itcTrees_subset.shp", filetype = "ESRI Shapefile")
+
+# Load shapefile as SpatVector
+rse <- vect("../data/itcTrees_subset/itcTrees_subset.shp")
+
+# Reproject to WGS 84 (EPSG:4326)
+rse4326 <- project(rse, "EPSG:4326")
+
+# Control question: where is this landscape from?
+r <- rast("../data/myDem_subset.tif")
+leaflet() %>% 
+  addTiles() %>% 
+  addProviderTiles("Esri.WorldPhysical") %>% 
+ # addProviderTiles("Esri.WorldImagery") %>% 
+  addRasterImage(r) %>% 
+  addPolygons(data=rse4326, weight = 1, color = "black" )   # Neat :)
+
+library(mapview)
+mapview(r)
+```
+
+
+# Task 13: Classify green areas and find the tree crowns in downtown Aarhus
+
+```{r uclassify-aarhus}
+a <- rast("../data/Aarhus_1m.TIF")
+plotRGB(a)
+
+library(RStoolbox)
+
+# unsupervised classification with 3 classes
+uc <- unsuperClass(a, nClasses = 4)
+
+# plot result using ggr (ggplot for rasters)
+library(ggplot2)
+ggR(uc$map, geom_raster = T, forceCat = T) +
+  scale_fill_manual(values = c("grey","darkgreen", "sandybrown",  "blue"))
+```
+
+## Try supervised classification of Aarhus city landuse with training data
+```{r sclassify-aarhus}
+library(sf)
+crs(a)
+train <- read_sf("../data/train_aarhus.geojson") %>% 
+  st_transform(crs = crs(a))
+st_crs(train)
+unique(train$Type)
+train <- train[-7,]
+
+train$Type <- factor(train$Type, levels = c("building", "forest", "paved", "water"))
+
+# plot input data
+ggRGB(a, r = 3, g = 2, b=1, stretch = "lin") +
+  geom_sf(data = train, aes(fill = Type)) + 
+  scale_fill_manual(values = c( "yellow", "darkgreen", "sandybrown", "blue"))
+```
+
+```{r rf-aarhus}
+# fit random forest (splitting training into 70\% training data, 30\% validation data)
+sc <- superClass(a, trainData = train, responseCol = "Type",
+                 model = "rf", tuneLength = 1, trainPartition = 0.7)
+
+# print model performance and confusion matrix
+sc$modelFit
+```
+
+
+```{r plot-aarhus-result}
+# plotting: convert class IDs to class labels (factorize) and plot
+library(ggplot2)
+r <- as.factor(sc$map)
+levels(r) <- data.frame(ID = 1:4, class_supervised = levels(train$Type))
+ggR(r, geom_raster = T, forceCat = T) + scale_fill_manual(values = c("sandybrown","darkgreen", "yellow",  "blue"))
+
+```
+
+# Task 14: Optional: Spectral unmixing
+Sometimes you want just a two-color/binary output, showing the breakdown on two main landuses (e.g. water vs urban, or forest vs paved, etc.)
+`RStoolbox` package offers spectral unmixing by implementing the Multiple Endmember Spectral Mixture Analysis (MESMA) approach for estimating fractions of spectral classes, such as spectra of surfaces or materials, on a sub-pixel scale. You can adapt the workflow below for an image of your choice.
+
+The following workflow shows a simple Spectral Mixture Analysis (SMA) with single endmembers per class, extracted from the lsat example image by cell id:
+
+```{r}
+library(RStoolbox)
+library(terra)
+
+#  to perform a SMA, use a single endmember per class, row by row:
+em <- data.frame(lsat[c(5294, 47916)])
+rownames(em) <- c("forest", "water")
+
+# umix the lsat image
+probs <- mesma(img = lsat, em = em)
+plot(probs)
+```
+
+Interactively select raster IDs
+```{r eval = F}
+library(terra)
+
+# Plot the image (pick one band or RGB to visualize)
+plotRGB(a, stretch = "lin")  # or RGB with plotRGB() if applicable
+
+# Interactively click on the map (e.g., to pick endmembers)
+clicks <- click(a, n = 4, cells = TRUE)  # 'n' = how many points to click
+
+# View clicked cell IDs and coordinates
+print(clicks)
+
+
+
+```
+
+# The End
+Similar approaches can be used when mapping socio-cultural phenomena in satellite imagery, from mosaicing images of night lights as proxies of economic performance, or detecting phenomena in the landscape such as burial mounds, growing urban sprawl, or tracing the outlines of scanned line drawings. (In the latter two you may need to base the classification on reflectance or edge detection rather than elevation.)
+
+# References
+https://geoscripting-wur.github.io/AdvancedRasterAnalysis/
+https://bleutner.github.io/RStoolbox/
+http://rspatial.org/spatial/rst/8-rastermanip.html
+http://neondataskills.org/R/Image-Raster-Data-In-R/
+https://geoscripting-wur.github.io/IntroToRaster/
+http://wiki.landscapetoolbox.org/doku.php/remote_sensing_methods:home
+https://rpubs.com/alobo/vectorOnraster
