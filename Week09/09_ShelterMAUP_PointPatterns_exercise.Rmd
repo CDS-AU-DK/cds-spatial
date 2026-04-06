@@ -1,0 +1,266 @@
+---
+title: "Civil Defence Shelters: MAUP and Point Patterns"
+author: "Adela Sobotkova"
+date: "04 April 2026 updated `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(sf)
+library(tidyverse)
+library(tmap)
+library(spatstat)
+library(sfarrow)
+library(mapview)
+```
+
+# Background
+
+Denmark built a network of **176 civil defence shelters** in Aarhus during the Cold War. Are they equitably distributed --- does every neighbourhood have equal access regardless of population density? This session uses shelter locations to explore two foundational spatial methods: the **Modifiable Areal Unit Problem (MAUP)** and **Point Pattern Analysis**.
+
+---
+
+# PART 1: MAUP --- Does the zoning frame change the answer?
+
+# Task 1: Load shelter data
+
+```{r load-shelters, eval=FALSE}
+# Load shelter point data (176 civil defence shelters, WGS84)
+shelters <- st_read("../data/sheltersAarhus.geojson")
+
+# How many shelters are there?
+nrow(shelters)
+
+# Quick interactive overview
+mapview(shelters)
+```
+
+# Task 2: Create spatial frames and compute equity metric
+
+```{r spatial-frames, eval=FALSE}
+# --- Transform shelters to UTM 32N for area-based operations ---
+shelters_utm <- st_transform(shelters, crs = 25832)
+
+# --- Frame A: 250 m square grid ---
+grid <- st_make_grid(________, cellsize = ________, square = TRUE) %>%
+  st_sf(frame = "grid", cell_id = seq_along(.), geometry = .)
+
+# --- Frame B: 500 m hex grid ---
+grid_hex <- st_make_grid(________, cellsize = ________, square = FALSE) %>%
+  st_sf(frame = "hex", cell_id = seq_along(.), geometry = .)
+
+# --- Frame C: Current urban districts ---
+districts <- st_read(________) %>%
+  st_transform(crs = 25832) %>%
+  rename(cell_id = ________) %>%   # it's good to have an id; check names(districts) to find the right field
+  mutate(frame = "historic") %>%
+  st_filter(shelters_utm, .join = "intersects")
+```
+
+### Count shelters and population per frame/grid cell
+```{r count-p-s, eval=FALSE}
+# --- Count shelters per unit in each frame ---
+# Use lengths(st_contains()) to get a count vector directly
+count_shelters <- function(frame_sf) {
+  frame_sf %>%
+    mutate(n_shelters = lengths(st_contains(frame_sf, shelters_utm)))
+}
+
+grid_count <- count_shelters(________)
+hex_count  <- count_shelters(________)
+hist_count <- count_shelters(________)
+
+# --- Load BBR population data ---
+bbr_sf <- sfarrow::st_read_parquet(________) %>%
+  st_transform(crs = 25832)
+
+# --- Aggregate est_pop per spatial unit ---
+agg_pop <- function(frame_sf) {
+  st_join(frame_sf, bbr_sf %>% select(est_pop), join = st_contains) %>%
+    group_by(cell_id) %>%
+    summarise(pop = sum(est_pop, na.rm = TRUE), .groups = "drop")
+}
+
+grid_pop <- agg_pop(________)
+hex_pop  <- agg_pop(________)
+hist_pop <- agg_pop(________)
+
+mapview(grid_pop, zcol = "pop")
+mapview(hex_pop,  zcol = "pop")
+mapview(hist_pop, zcol = "pop")
+
+# --- Compute shelters per 100 residents ---
+add_equity <- function(count_sf, pop_sf) {
+  count_sf %>%
+    left_join(st_drop_geometry(pop_sf), by = "cell_id") %>%
+    mutate(shelters_per_100 = if_else(pop > 0, n_shelters * 100 / pop, NA_real_))
+}
+
+grid_eq <- add_equity(grid_count, grid_pop)
+hex_eq  <- add_equity(hex_count,  hex_pop)
+hist_eq <- add_equity(hist_count, hist_pop)
+```
+
+# Task 3: Map and compare MAUP frames
+
+```{r maup-maps, eval=FALSE}
+tmap_mode("view")
+
+make_map <- function(eq_sf, title) {
+  tm_shape(eq_sf %>% filter(pop > 0, is.finite(shelters_per_100))) +
+    tm_polygons("shelters_per_100",
+                style = "pretty",
+                fill.legend = tm_legend(title = "Shelters\nper 100"),
+                palette = "YlOrRd") +
+  tm_shape(shelters_utm) +
+    tm_dots(size = 0.5, col = "black") +
+    tm_title(title)
+}
+
+m_grid <- make_map(________, "250 m grid")
+m_hex  <- make_map(________, "500 m hex")
+m_hist <- make_map(________, "Urban districts")
+
+tmap_arrange(m_grid, m_hex, m_hist, ncol = 3)
+
+# Interpretation: write 2 sentences below explaining how the apparent
+# equity pattern changes across the three frames
+```
+
+What other containers would you suggest we use to bin the shelters more equitably?
+---
+
+# PART 2: Point Pattern Analysis
+
+# Task 4: Convert shelters to ppp
+
+```{r shelters-ppp, eval=FALSE}
+# Project shelters to UTM zone 32N (EPSG:25832) — ppp requires projected CRS
+shelters_utm <- st_transform(________, crs = 25832)
+
+# Extract coordinates
+coords <- st_coordinates(shelters_utm)
+
+# Define observation window from bounding box
+win <- as.owin(st_bbox(shelters_utm))
+
+# Create ppp object (176 points)
+shelters_ppp <- ppp(x = coords[, "X"], y = coords[, "Y"], window = win)
+shelters_ppp
+
+# Note: edge effects may inflate intensity near the window boundary.
+# The K-function envelope in Task 7 uses border correction to address this.
+```
+
+# Task 5: Quadrat test
+
+```{r quadrat-test, eval=FALSE}
+# Quadrat test: divide window into 5x5 grid, compare observed counts to CSR
+qt <- quadrat.test(________, nx = 5)
+qt
+plot(qt, main = "Quadrat test — Aarhus shelters")
+
+# Interpretation: what does the p-value tell us about whether shelters
+# are randomly distributed? Does non-randomness imply equitable coverage?
+```
+
+# Task 6: Nearest-neighbour distances and G function
+
+```{r nnd-gest, eval=FALSE}
+# Mean nearest-neighbour distance (in metres, UTM projection)
+mean_nnd <- mean(nndist(________))
+cat("Mean nearest-neighbour distance:", round(mean_nnd), "m\n")
+
+# G function with simulation envelope (99 simulations)
+env_g <- envelope(________, Gest, nsim = 99)
+plot(env_g, main = "G function — Aarhus shelters")
+
+# Interpretation: does the G curve rise steeply at short distances
+# (clustering) or slowly (regularity/CSR)? What does this mean for
+# equitable access?
+```
+
+# Task 7: K function
+
+```{r kest, eval=FALSE}
+# K function with simulation envelope (border correction, 99 simulations)
+env_k <- envelope(________, Kest, nsim = 99)
+
+# Linearised plot: subtract Poisson expectation (stored in 'theo' column)
+plot(env_k, . - theo ~ r,
+     main = "Linearised K function — Aarhus shelters",
+     ylab = "K(r) - pi*r^2")
+
+# Interpretation: above zero = more clustering than CSR at that scale.
+# What scale(s) show the strongest clustering?
+# How does this relate to the equity question from Part 1?
+```
+
+---
+
+# Challenge Extension (Optional): Bivariate Point Patterns --- Chicago Crime
+
+*This section is self-contained and independent of Parts 1--2. Skip it if time is short.*
+
+Are arson fires and liquor law violations spatially attracted to each other in Chicago?
+
+```{r chicago-challenge, eval=FALSE}
+# Load raw Chicago crime data (268,505 rows)
+crimes <- read_csv(________)
+
+# Filter to two crime types
+# Note: column is "Primary Type" (mixed case) — backtick quoting required
+arson_pts  <- crimes %>% filter(`Primary Type` == "ARSON")
+liquor_pts <- crimes %>% filter(`Primary Type` == "LIQUOR LAW VIOLATION")
+
+# Sanity check — these exact counts are expected
+stopifnot(nrow(arson_pts)  == 444)
+stopifnot(nrow(liquor_pts) == 191)
+
+# Drop rows with missing coordinates
+arson_pts  <- arson_pts  %>% filter(!is.na(Longitude), !is.na(Latitude))
+liquor_pts <- liquor_pts %>% filter(!is.na(Longitude), !is.na(Latitude))
+
+# Define a common observation window from the combined extent
+combined_lon <- c(arson_pts$Longitude, liquor_pts$Longitude)
+combined_lat <- c(arson_pts$Latitude,  liquor_pts$Latitude)
+win_ch <- owin(xrange = range(combined_lon), yrange = range(combined_lat))
+
+# Create individual ppp objects
+pp_arson  <- ppp(arson_pts$Longitude,  arson_pts$Latitude,  window = win_ch)
+pp_liquor <- ppp(liquor_pts$Longitude, liquor_pts$Latitude, window = win_ch)
+
+# Superimpose into a single marked ppp (required for Kcross)
+pp_combined <- superimpose(arson = pp_arson, liquor = pp_liquor)
+
+# Bivariate K: are arson events attracted to liquor violations?
+env_cross <- envelope(pp_combined, Kcross,
+                      i = "arson", j = "liquor",
+                      nsim = 39,
+                      fix.n = TRUE)
+plot(env_cross,
+     main = "Kcross: Arson events around Liquor law violations")
+
+# Interpretation: if the cross-K curve sits ABOVE the simulation envelope,
+# arson events are attracted to liquor violation locations at that scale.
+# If below, they repel. If within the envelope, the two crime types are
+# spatially independent.
+```
