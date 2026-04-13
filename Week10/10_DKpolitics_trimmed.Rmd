@@ -1,0 +1,194 @@
+---
+title: "North and South: Syrian crisis, Danish voters and spatial autocorrelation"
+author: "Adela Sobotkova"
+date: "04 April 2026 updated `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(sf)
+library(tidyverse)
+library(tmap)
+library(spdep)
+library(mapview)
+```
+
+# Background
+
+Does political preference have a spatial structure in Denmark? Are municipalities that vote similarly located near each other, or are voting patterns scattered at random? This session uses Moran's I to test **spatial autocorrelation** in Danish election results before and after the Syrian crisis.
+
+Data: `data/elections_sp.rds` — a pre-joined sf object (CRS EPSG:32632) with municipality geometry and voting fractions for five parties in 2011, 2015, and 2019.
+
+---
+
+# Task 1: Load spatial and election data (~15 min)
+
+Load the municipal boundary and historical election data `elections_sp.rds`, join them, and make a quick map to verify coverage.
+
+```{r load-data, eval=FALSE}
+# Load the pre-joined spatial elections dataset
+# elections_sp.rds is an sf object (CRS EPSG:32632, already projected)
+# Columns: NAME_2, Party, Y2011/Y2015/Y2019 (total votes),
+#          sum2011/2015/2019 (electorate), pct_vote2011/2015/2019 (fraction)
+elections <- readRDS("../data/________")
+
+# How many rows? How many distinct municipalities?
+nrow(elections)
+length(unique(elections$NAME_2))
+
+# How many parties?
+unique(elections$Party)
+
+# Map the A.Socialdemokratiet fraction in 2015 to get oriented. 
+# Which function helps you find specific strings inside filter()?
+elections %>%
+  filter(_____("__", Party)) %>%    # Party starts with "A" = Socialdemokratiet
+  mapview(zcol = "________")        # e.g. pct_vote2015
+```
+
+# Task 2: Explore political geography with tmap (~15 min)
+
+Compare how Danske Folkeparti and Socialdemokratiet vote shares are distributed across Denmark. Map a single year (2015) — then change the year column if time allows.
+
+```{r map-parties, eval=FALSE}
+library(tmap)
+
+# Map two parties side by side using tm_facets
+# Filter to Danske Folkeparti (Party starts with "O") and
+# Socialdemokratiet (Party starts with "A")
+elections %>%
+  filter(_____("^A|^O", Party)) %>%
+  tm_shape() +
+  tm_facets(by = "________") +
+  tm_polygons("________",
+              fill.legend = tm_legend(title = "Vote share 2015"),
+             position = tm_pos_out("right", "center")))
+
+# What spatial pattern do you see for Danske Folkeparti?
+# Is there a north-south or urban-rural gradient?
+```
+
+# Task 3: Spatial autocorrelation — queen contiguity (~30 min)
+
+Are neighbouring municipalities more similar in their Danske Folkeparti support than random pairs? Test this with Moran's I.
+
+## Define neighbours
+
+```{r nb-contiguity, eval=FALSE}
+# elections_sp.rds is already projected (EPSG:32632)
+# Simplify boundaries slightly for faster computation /rendering
+mun_sm <- st_simplify(elections %>% filter(______) ,  # filter so you only get 99 shapes 
+                      dTolerance = _____)  # put in a number between 100-250 and observe the difference
+
+# Create queen-contiguity neighbour list
+nb <- poly2nb(________, queen = TRUE)
+nb
+
+# Get municipality centroids for visualisation
+mun_centers <- st_coordinates(st_centroid(mun_sm$geometry))
+
+# Plot the neighbour connections
+plot(mun_sm$geometry)
+plot(nb, mun_centers, col = "red", add = TRUE)
+title("Queen contiguity neighbours")
+```
+
+## Moran's I test
+
+```{r moran-df, eval=FALSE}
+# Subset to Danske Folkeparti
+DF <- elections %>% filter(grepl("^O", Party))
+
+# Row-standardised spatial weights
+lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
+
+# Moran's I test (theoretical distribution)
+moran.test(DF$________,      # pct_vote2015
+           lw,
+           zero.policy = TRUE)
+
+# Monte Carlo permutation test (more reliable p-value)
+moran.mc(DF$________,
+         lw,
+         nsim = 999,
+         zero.policy = TRUE)
+
+# Interpretation: what is the Moran I statistic?
+# Does the p-value allow you to reject the null of no spatial autocorrelation?
+# Is DF support positively or negatively autocorrelated in space?
+```
+
+# Task 4: Alternative neighbourhood definition — 50 km distance band (~20 min)
+
+Does the result depend on how we define neighbours? Test with a 50 km distance band instead of shared borders.
+
+```{r nb-distance, eval=FALSE}
+# Get centroids as sf (needed for dnearneigh)
+mun_centers_sf <- st_centroid(mun_sm$geometry, of_largest_polygon = TRUE)
+
+# Neighbours within 0–50 km
+nb_50 <- dnearneigh(mun_centers_sf, 0, 50000)
+
+# Visualise
+plot(mun_sm$geometry)
+plot(nb_50, mun_centers_sf, col = "blue", add = TRUE)
+title("Neighbours within 50 km")
+
+# Row-standardised weights
+lw_50 <- nb2listw(nb_50, style = "W", zero.policy = TRUE)
+
+# Moran's I with distance-band neighbours
+moran.test(DF$________,
+           lw_50,
+           zero.policy = TRUE)
+
+# Does the conclusion change? Why might island municipalities behave differently
+# under contiguity vs. distance-band definitions?
+```
+
+---
+
+# Optional Diversion: Cartogram
+
+*Skip this section if you are short on time — it is popular but not required for the main learning objectives.*
+
+A **cartogram** distorts region areas so they are proportional to a chosen variable (e.g. total electorate). Regions with more voters appear larger; rural regions with few voters shrink.
+
+```{r cartogram, eval=FALSE}
+library(cartogram)
+
+# cartogram_cont() requires a projected CRS
+# Filter to Danske Folkeparti 2015
+DF <- elections %>%
+  filter(grepl("^O", Party)) %>%
+  st_transform(crs = 25832)
+
+# Create cartogram scaled to total electorate in 2015
+DF_carto <- cartogram_cont(DF, weight = "________", itermax = 15)
+# weight = quoted column name, e.g. "sum2015" for total electorate
+
+# Plot the cartogram
+plot(DF_carto["________"],
+     main = "Cartogram: Danske Folkeparti 2015\n(area scaled to total electorate)")
+
+# Compare: does the spatial pattern look different from the regular map?
+# Which municipalities gained area? Which shrank?
+```
