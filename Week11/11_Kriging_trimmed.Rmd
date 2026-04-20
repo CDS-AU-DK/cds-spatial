@@ -1,0 +1,237 @@
+---
+title: "Kazanlak Kriging: Filling the gaps"
+author: "Adela Sobotkova"
+date: "04 April 2026 updated `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(sf)
+library(tidyverse)
+library(gstat)
+```
+
+# Background
+
+Archaeologists surveyed soil organic matter (OM) across the Kazanlak valley in Bulgaria. Sampling covered open fields, but not the ancient settlement mounds themselves. **Kriging** uses the spatial structure of the sampled data to predict OM values at unsampled locations — including the settlement sites. Did Bronze Age people choose to settle near nutrient-rich soils?
+
+OM values range from 0 (nutrient-poor) to 9 (nutrient-rich). Ancient village centroids are in `KAZ_scatterpoints.shp`.
+
+---
+
+# Task 1: Load data and explore spatial structure (~15 min)
+
+```{r load-data, eval=FALSE}
+# Load geochemical survey data
+kaz_geo <- read_csv("../data/KAZ_geo.csv")
+
+# Spatialise: coordinates are Longitude/Latitude (WGS84)
+kaz_geo <- kaz_geo %>%
+  st_as_sf(coords = c("Long", "Lat"), crs = 4326) %>%
+  st_transform(crs = 32635)   # UTM zone 35N — matches the site data
+
+# Add X, Y coordinate columns (needed for trend formula later)
+kaz_geo$X <- st_coordinates(kaz_geo)[, 1]
+kaz_geo$Y <- st_coordinates(kaz_geo)[, 2]
+
+# Load ancient village sites
+kaz_sites <- st_read("../data/KAZ_scatterpoints.shp") %>%
+  st_transform(crs = 32635)
+
+# Quick look at OM distribution
+summary(kaz_geo$OM_muns)
+hist(kaz_geo$OM_muns, main = "Organic matter distribution", xlab = "OM")
+
+# Map both datasets
+ggplot(kaz_geo) +
+  geom_sf(aes(col = OM_muns)) +
+  geom_sf(data = kaz_sites, colour = "red", shape = 17, size = 2) +
+  scale_colour_viridis_c(name = "OM") +
+  labs(title = "Kazanlak soil organic matter + ancient sites")
+```
+
+# Task 2: Fit a trend surface (~10 min)
+
+The OM values show a broad NW–SE gradient. Fitting a linear trend surface helps separate the large-scale trend from local variability.
+
+```{r trend-surface, eval=FALSE}
+# Fit a linear spatial trend model (universal kriging preparation)
+m_trend <- lm(OM_muns ~ X + Y, data = kaz_geo)
+summary(m_trend)
+
+# Are the X and Y coefficients significant?
+# Significant coefficients suggest a genuine spatial trend in OM values.
+```
+
+# Task 3: Compute and fit the variogram (~25 min)
+
+## Empirical variogram
+
+The variogram describes how spatial variance between pairs of observations increases with distance.
+
+First, see what a variogram is composed of.
+```{r cloud-variogram}
+?variogram()
+# Make a cloud from the non-missing data up to 10km
+plot(variogram(OM_muns ~ 1, kaz_geo, 
+               cloud = TRUE, 
+               cutoff = 10000))
+```
+
+Next, create two variograms.
+In the first formula `OM_muns ~1` assumes a constant mean. Computes semivariance on the raw values.
+
+In the second formula, `OM_muns = β0 + β1·X + β2·Y` by OLS, then computes the variogram on the residuals. This is the standard "first remove a planar trend, then look at the spatial structure of what's left" move.
+
+What the two formulas mean?
+`OM_muns ~ 1 `means: "Just take the OM values as they are and make a variogram." The 1 is shorthand for "assume the average is the same everywhere in the study area."
+`OM_muns ~ X + Y` means: "Before making the variogram, first check whether OM is systematically higher on one side of the map than the other — like if the north is richer than the south, or the east richer than the west. If so, strip that pattern out, and then make the variogram on what's left over."
+
+Why would you want to strip that out? Because a big regional gradient can disguise the smaller-scale patterns you actually care about. Imagine studying whether houses on the same block have similar prices — if you don't first account for the fact that Manhattan is more expensive than Queens overall, your analysis gets muddled by that citywide trend.
+
+```{r empirical-variogram, eval=FALSE}
+# 1. Make a variogram of the non-missing data
+plot(variogram(OM_muns ~ 1, kaz_geo))
+
+# 2. Compute empirical variogram (trend-corrected)
+v_emp <- variogram(OM_muns ~ X + Y, data = kaz_geo)
+
+# 3. Make a variogram of data with a trend
+plot(v_emp, main = "Empirical variogram — Kazanlak OM")
+
+# The two area nearly the same because the NW - > SE trend is nearly flat, ie. linear. 
+# Interpret: at what distance does the variogram level off (the 'range')?
+# What is the sill (the plateau variance value)?
+# Is there a nugget (non-zero variance at distance zero)?
+```
+
+## Fit a variogram model
+
+```{r fit-variogram, eval=FALSE}
+# Fit a spherical model (try also Exp or Gau or Mat by changing the model string)
+v_model <- fit.variogram(v_emp, model = vgm("Sph"))
+v_model
+
+# Overlay the fitted model on the empirical variogram
+plot(v_emp, model = v_model,
+     main = "Empirical variogram + spherical model fit")
+
+# Does the spherical model fit well? If not, try "Exp" (exponential) or
+# "Gau" (Gaussian) instead.
+```
+
+# Task 4: Kriging at village locations (~20 min)
+
+Now predict OM at the ancient village centroids.
+
+```{r krige-points, eval=FALSE}
+# Prepare prediction locations (village sites)
+# Add X, Y coordinate columns to match the trend formula
+kaz_sites <- kaz_sites %>%
+  mutate(X = st_coordinates(.)[, 1],
+         Y = st_coordinates(.)[, 2])
+
+# Ordinary/universal kriging at village locations
+km_points <- krige(OM_muns ~ X + Y,
+                   locations = kaz_geo,
+                   newdata   = kaz_sites,
+                   model     = v_model)
+
+# Map predicted OM at village sites
+ggplot(km_points) +
+  geom_sf(aes(col = var1.pred)) +
+  scale_colour_viridis_c(name = "Predicted OM") +
+  labs(title = "Kriged OM predictions at ancient villages")
+
+# Compute probability of high fertility (OM > 5)
+km_points$p_fertile <- 1 - pnorm(5,
+                                   mean = km_points$var1.pred,
+                                   sd   = sqrt(km_points$var1.var))
+
+ggplot(km_points) +
+  geom_sf(aes(col = p_fertile)) +
+  scale_colour_viridis_c(name = "P(OM > 5)") +
+  labs(title = "Probability of fertile soil at ancient villages")
+
+# Do village locations seem to prefer high-OM (fertile) or low-OM soils?
+```
+
+# Task 5: Gridded kriging — predictions across the valley (~20 min)
+
+Predicting at a regular grid gives a continuous surface across the entire study area.
+
+```{r krige-grid, eval=FALSE}
+# Create a 500 m prediction grid over the survey area (modern sf workflow)
+grid_sf <- st_make_grid(kaz_geo, cellsize = 500, what = "centers") %>%
+  st_as_sf() %>%
+  st_filter(st_convex_hull(st_union(kaz_geo)))  # crop to survey extent
+
+# Add X, Y columns for the trend formula
+grid_sf <- grid_sf %>%
+  mutate(X = st_coordinates(.)[, 1],
+         Y = st_coordinates(.)[, 2])
+
+# Kriging over the grid
+km_grid <- krige(OM_muns ~ X + Y,
+                 locations = kaz_geo,
+                 newdata   = grid_sf,
+                 model     = v_model)
+
+# Map the kriged surface
+ggplot(km_grid) +
+  geom_sf(aes(col = var1.pred), size = 0.5) +
+  scale_colour_viridis_c(name = "Predicted OM") +
+  labs(title = "Kriged OM surface — Kazanlak valley")
+
+# Add village sites as an overlay
+ggplot(km_grid) +
+  geom_sf(aes(col = var1.pred), size = 0.5) +
+  geom_sf(data = kaz_sites, colour = "red", shape = 17, size = 2) +
+  scale_colour_viridis_c(name = "Predicted OM") +
+  labs(title = "Kriged OM surface with ancient village sites")
+```
+
+---
+
+# Optional: Auto-kriging (time permitting)
+
+*The `automap` package automates variogram fitting and kriging. It is a useful sanity check but less educational than the manual workflow above.*
+
+*Note: `automap` may not be installed in the course environment. If needed: `install.packages("automap")`. Current automap (v1.1-9) accepts sf objects via a thin wrapper, but coercion to `Spatial*` is used here for compatibility across versions.*
+
+```{r auto-krige, eval=FALSE}
+# install.packages("automap")  # uncomment if not installed
+library(automap)
+library(sp)   # required for as(..., "Spatial") coercion; already installed as sf dependency
+
+# Auto-kriging over the grid
+OM_auto_grid <- autoKrige(OM_muns ~ X + Y,
+                           input_data = as(kaz_geo, "Spatial"),
+                           new_data   = as(grid_sf, "Spatial"),
+                           model      = "Mat")
+
+plot(OM_auto_grid)
+
+# Compare the auto-fitted variogram model to the manual one:
+v_model                   # manual
+OM_auto_grid$var_model    # automatic
+# Are the range and sill parameters similar?
+```

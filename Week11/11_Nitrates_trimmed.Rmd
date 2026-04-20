@@ -1,0 +1,247 @@
+---
+title: "Danish Groundwater Nitrates: Kriging and Ecological Farming"
+author: "Adela Sobotkova, adapted from Johan Horsmans and Emil Jessen"
+date: "April 2026 updated `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r libraries, include=FALSE}
+library(sf)
+library(terra)
+library(tidyverse)
+library(gstat)
+library(tmap)
+```
+
+# Background
+
+Nitrate leaching from agricultural fertiliser is a well-known threat to Danish groundwater. Does organic (ecological) farming really produce lower nitrate levels than conventional farming?
+
+We will:
+
+1. Spatialise nitrate point measurements from Danish boreholes.
+2. Krige a continuous nitrate surface across Denmark.
+3. Extract predicted nitrate values inside *organic* vs *conventional* agricultural fields.
+4. Test whether the two land-use types differ.
+
+If there are no nitrates.csv in your data/ folder, download it from this [sciencedata link](https://sciencedata.dk/themes/deic_theme_oc7/apps/files_sharing/public.php?t=190154e3aa98e3c9dc0cfe726d355963&) and unzip it into a `data/` folder inside Week11.
+
+---
+
+# Task 1: Spatialise the nitrate measurements (~10 min)
+
+`nitrate.csv` holds borehole measurements with a WKT geometry column and values in mg/L. The coordinates are in EPSG:25832 (ETRS89 / UTM zone 32N) but the CSV does **not** carry that information — you need to assign it.
+
+```{r nitrate-load, eval=FALSE}
+# Load the CSV and rename the awkward Danish column names
+nitrate <- read_csv("../data/nitrate.csv") %>% as.data.frame()
+
+names(nitrate)[names(nitrate) == "Seneste"]       <- "measurement_date"
+names(nitrate)[names(nitrate) == "Seneste mg/l"]  <- "nitrate_concentration"
+names(nitrate)[names(nitrate) == "Indtag topdybde"] <- "measurement_depth"
+
+# Quick sanity filter:
+#   * drop implausibly high concentrations (> 200 mg/L)
+#   * keep only shallow boreholes (0 < depth < 15 m) so we measure surface nitrates
+nitrate <- nitrate %>%
+  filter(nitrate_concentration < 200,
+         measurement_depth > 0,
+         measurement_depth < 15)
+```
+
+## Convert to `sf` using the WKT column
+
+```{r nitrate-sf, eval=FALSE}
+# Turn the data frame into an sf object using the WKT column
+nitrate <- st_as_sf(nitrate, wkt = __________)
+
+# The CSV has no CRS metadata — assign EPSG  (which one 25832, 32632, or 4326?)
+nitrate <- st_set_crs(nitrate, value = _________)
+
+# Verify
+st_crs(nitrate)[1]
+```
+
+*Why do we `st_set_crs()` here rather than `st_transform()`?*
+
+## Tidy and plot
+
+```{r nitrate-tidy, eval=FALSE}
+# Keep measurements between 2012 and 2021, drop duplicated boreholes
+nitrate <- nitrate %>%
+  select(measurement_date, nitrate_concentration, measurement_depth, WKT) %>%
+  filter(measurement_date >= as.Date("2012-01-01"),
+         measurement_date <= as.Date("2021-03-10")) %>%
+  distinct(WKT, .keep_all = TRUE)
+
+# Add X/Y columns — we will need them as a trend for kriging
+nitrate$Easting  <- st_coordinates(nitrate)[, 1]
+nitrate$Northing <- st_coordinates(nitrate)[, 2]
+
+# Quick map
+ggplot(nitrate, aes(colour = nitrate_concentration)) +
+  geom_sf(size = 0.3) +
+  scale_colour_gradientn(colours = c("darkgreen", "yellow", "red")) +
+  labs(title = "Nitrate measurements 2012–2021", colour = "mg/L") +
+  theme_minimal()
+```
+
+---
+
+# Task 2: Organic vs conventional fields (~5 min)
+
+## What are "Økologiske arealer"?
+
+The Danish Agricultural Agency publishes an annual shapefile of all registered **ecological (organic) fields** — `Oekologiske_arealer_<year>.shp`. The full dataset `Markblokke_2022.shp` contains **every** registered field block in Denmark. A field is *conventional* if it appears in `Markblokke` but not in any of the organic layers.
+
+For this exercise we use the **2012-2022 snapshot** as a representative organic layer and derive conventional fields by spatial anti-join. The separate years for 2012–2020 are left as an optional extension at the bottom.
+
+```{r load-fields, eval=FALSE}
+# All registered fields in Denmark (2022)
+all_fields <- st_read("../data/Markblokke_2022.shp")
+
+# Organic fields collated through 2022 (but single year is enough for the method if you find that easier)
+organic_fields <- readRDS("../data/oekologiske_arealer.rds")
+
+
+# Conventional = all_fields that do NOT intersect any organic polygon
+idx_conv <- lengths(st_intersects(all_fields, organic_fields)) == 0
+conventional_fields <- all_fields[idx_conv, ]
+
+# How many were removed as organic?
+nrow(all_fields) - nrow(conventional_fields)
+
+# Random subsample of organic fields to balance class sizes and cut compute
+set.seed(42)
+organic_fields <- organic_fields %>%
+  slice_sample(n = nrow(conventional_fields))
+```
+
+*Why subsample the organic fields? What would happen to the t-test if we kept all ~600k of them?*
+
+---
+
+# Task 3: Variogram and kriging (~15 min)
+
+```{r variogram, eval=FALSE}
+# Empirical variogram with a linear X+Y trend (to detrend the N–S gradient)
+vgm_emp <- variogram(nitrate_concentration ~ Easting + Northing, data = nitrate)
+plot(vgm_emp, main = "Empirical variogram — Danish nitrates")
+
+# Eyeball sill / range / nugget, then fit a Stein-Matern model
+v_model <- fit.variogram(
+  vgm_emp,
+  model = vgm(model = "Ste",
+              nugget = 650,
+              psill  = 200,
+              range  = 40000,
+              kappa  = 0.5)
+)
+
+plot(vgm_emp, model = v_model, main = "Fitted variogram")
+```
+
+*At roughly what distance does spatial correlation die off? Does a 40 km range feel sensible for a country-scale process?*
+
+## Build a prediction grid and krige
+
+```{r krige-grid, eval=FALSE}
+# 2 km regular grid across the nitrate bounding box — modern sf workflow
+grid_sf <- st_make_grid(nitrate, cellsize = 2000, what = "centers") %>%
+  st_as_sf() %>%
+  mutate(Easting  = st_coordinates(.)[, 1],
+         Northing = st_coordinates(.)[, 2])
+
+# Kriging interpolation
+nitrate_grid <- krige(nitrate_concentration ~ Easting + Northing,
+                      locations = nitrate,
+                      newdata   = grid_sf,
+                      model     = v_model)
+
+# Crop to Denmark and map
+
+# First create DK out of your regional (not municipal) polygons
+DK <- readRDS("../data/gadm_______________") %>%
+  st_as_sf() %>% 
+  st_set_crs(4326) %>%
+  _________ %>%  # what do you need to do to get the country' border?
+  st_transform(25832)
+
+nitrate_dk <- nitrate_grid[DK, ]
+
+tm_shape(nitrate_dk) +
+  tm_dots(col = "var1.pred", palette = "-RdYlGn", size = 0.1,
+          title = "Predicted nitrate (mg/L)") +
+  tm_shape(DK) + tm_borders() +
+  tm_layout(main.title = "Kriged nitrate surface — Denmark")
+```
+
+---
+
+# Task 4: Do organic fields have lower nitrates? (~10 min)
+
+Attach each kriged grid point to the field polygon it falls inside, then compare group means.
+
+```{r extract-compare, eval=FALSE}
+# Spatial join — each grid cell inherits the field polygon it sits within
+organic_pred <- st_join(nitrate_dk, organic_fields, join = st_within, left = FALSE) %>%
+  mutate(land_type = "organic")
+
+conventional_pred <- st_join(nitrate_dk, conventional_fields, join = st_within, left = FALSE) %>%
+  mutate(land_type = "conventional")
+
+merged <- bind_rows(
+  st_drop_geometry(organic_pred)[,      c("var1.pred", "land_type")],
+  st_drop_geometry(conventional_pred)[, c("var1.pred", "land_type")]
+)
+
+# Quick visual and formal test
+boxplot(var1.pred ~ land_type, data = merged,
+        ylab = "Kriged nitrate (mg/L)", main = "Organic vs conventional fields")
+
+t.test(var1.pred ~ land_type, data = merged)
+
+lm_model <- lm(var1.pred ~ land_type, data = merged)
+summary(lm_model)
+```
+
+*Interpret the t-test and the regression coefficient. Are organic fields associated with lower predicted nitrate? Is the difference large enough to matter agronomically?*
+
+---
+
+# Optional extension: Union across multiple organic years
+
+*Skip unless you finish early.* The published organic layers 2012 / 2016 / 2018 / 2019 / 2020 capture different farms in different years. Unioning them gives a more complete "ever-organic" mask, but changes the conventional baseline.
+
+
+```{r multi-year, eval=FALSE}
+years  <- c(2012, 2016, 2018, 2019, 2020)
+layers <- lapply(years, function(y) {
+  st_read(sprintf("data/Oekologiske_arealer_%d.shp", y)) %>%
+    na.omit() %>%
+    st_geometry()
+})
+
+organic_all <- do.call(c, layers) %>% st_as_sf()
+
+# Re-run the spatial anti-join and the kriging extraction above with organic_all
+# in place of organic_fields. Does the t-test result strengthen, weaken, or flip?
+```
